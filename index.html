@@ -175,6 +175,97 @@
       </div>
     </div>
 
+    <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title"><i class="bi bi-eye"></i> Concurso {{ selectedDetails?.concurso }}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body text-center" v-if="selectedDetails">
+            <p class="text-muted small mb-3">
+              {{ selectedDetails.data }}
+            </p>
+
+            <div class="mb-3">
+              <span v-for="bola in selectedDetails.numbersWithColor"
+                class="ball lg"
+                :style="bola.style"
+                style="width:40px;height:40px;line-height:40px;font-size:1.1rem;margin:2px;">
+                {{ bola.val }}
+              </span>
+            </div>
+
+            <ul class="list-group list-group-flush text-start small border rounded">
+              <li class="list-group-item d-flex justify-content-between">
+                <span>Soma:</span> <span class="fw-bold">{{ selectedDetails.sum }}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between">
+                <span>Pares / Ímpares:</span> <span class="fw-bold">{{ selectedDetails.even }} / {{ 5 - selectedDetails.even }}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between">
+                <span>Primos:</span> <span class="fw-bold">{{ selectedDetails.primes }}</span>
+              </li>
+              <li class="list-group-item bg-light text-muted text-center" style="font-size: 0.75rem">
+                Cores baseadas em {{ previousGamesCount }} sorteios anteriores a este.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="simModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-dark text-white">
+            <h5 class="modal-title"><i class="bi bi-cpu"></i> Quebrando a Banca</h5>
+            <button type="button" class="btn-close btn-close-white" @click="stopSim" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body text-center" v-if="simState.targetGame">
+
+            <h6 class="text-muted small text-uppercase fw-bold">Alvo (Concurso {{ simState.targetGame.concurso }})</h6>
+            <div class="mb-3">
+              <span v-for="n in simState.targetGame.dezenas" class="ball bg-success">{{ n }}</span>
+            </div>
+
+            <h6 class="text-muted small text-uppercase fw-bold mt-4">Simulação (Tentativa Atual)</h6>
+            <div class="mb-2" style="min-height: 40px;">
+              <span v-for="n in simState.bestTry" class="ball" :class="simState.running ? 'bg-secondary' : 'bg-warning text-dark'">{{ n }}</span>
+            </div>
+
+            <div class="card bg-light border-0 mt-3">
+              <div class="card-body">
+                <div class="row text-center">
+                  <div class="col-6 border-end">
+                    <small class="text-muted d-block">Tentativas</small>
+                    <span class="fs-5 fw-bold font-monospace">{{ simState.attempts.toLocaleString() }}</span>
+                  </div>
+                  <div class="col-6">
+                    <small class="text-muted d-block">Tempo</small>
+                    <span class="fs-5 fw-bold font-monospace">{{ simState.elapsedTime }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="alert alert-info small mt-3 text-start py-2">
+              <i class="bi bi-robot"></i> O robô está gerando números respeitando <strong>exatamente</strong> os critérios deste sorteio:
+              <ul class="mb-0 ps-3 mt-1" style="font-size: 0.8rem;">
+                <li>Soma exata: <strong>{{ simState.targetGame.sum }}</strong></li>
+                <li>Pares/Ímpares exatos: <strong>{{ simState.targetGame.even }} / {{ 5 - simState.targetGame.even }}</strong></li>
+                <li>Primos exatos: <strong>{{ simState.targetGame.primes }}</strong></li>
+                <li>Distribuição de Frequência idêntica (Quintis).</li>
+              </ul>
+            </div>
+          </div>
+          <div class="modal-footer justify-content-center">
+            <button v-if="simState.running" class="btn btn-danger w-100" @click="stopSim">Parar Simulação</button>
+            <button v-else class="btn btn-dark w-100" data-bs-dismiss="modal">Fechar</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="modal fade" id="filterModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
@@ -330,6 +421,7 @@
                   </th>
                   <th class="text-nowrap">Data</th>
                   <th>Dezenas</th>
+                  <th>Detalhes</th>
                 </tr>
               </thead>
               <tbody :class="{ 'table-dimmed': highlightNum !== null }">
@@ -338,6 +430,15 @@
                   <td class="text-nowrap">{{ row.data }}</td>
                   <td class="text-nowrap">
                     <span v-for="bola in row.dezenas" class="ball" :class="{ 'active-highlight': highlightNum === bola }" @click="toggleHighlight(bola)">{{ bola }}</span>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-secondary border-0" @click="openDetails(row)">
+                      <i class="bi bi-eye-fill"></i>
+                    </button>
+
+                    <button class="btn btn-sm btn-outline-warning border-0 text-dark" @click="openSimulation(row)" title="Simular acerto">
+                      <i class="bi bi-cpu-fill"></i>
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -372,6 +473,20 @@
           genConfig: {
             minSum: 140, maxSum: 260, evenCount: 'any', primeCount: 'any'
           },
+          detailsModal: null, // Referência ao modal do Bootstrap
+          selectedDetails: null, // Dados do jogo selecionado para exibição
+          previousGamesCount: 0, // Contador de quantos jogos serviram de base para a estatística
+          simModal: null,
+          simState: {
+            running: false,
+            attempts: 0,
+            startTime: null,
+            elapsedTime: '00:00',
+            targetGame: null, // O jogo que queremos acertar
+            bestTry: null, // A tentativa atual
+            quintilePattern: [], // O padrão de quintis (ex: [2, 1, 1, 0, 1])
+            chunks: [] // Os grupos de números usados na simulação
+          }
         }
       },
       watch: {
@@ -462,6 +577,112 @@
         }
       },
       methods: {
+        openDetails(row) {
+          const currentConcurso = parseInt(row.concurso);
+
+          // 1. Identificar Data Inicial do Filtro Global (se houver)
+          let filterDateObj = null;
+          if (this.filterStartDate) {
+            const p = this.filterStartDate.split('-');
+            filterDateObj = new Date(p[0], p[1]-1, p[2]);
+            filterDateObj.setHours(0, 0, 0, 0);
+          }
+
+          // 2. Filtrar jogos do Passado (Anteriores ao selecionado + Respeitando filtro)
+          const pastGames = this.results.filter(r => {
+            const rConcurso = parseInt(r.concurso);
+            // Deve ser estritamente anterior ao concurso atual
+            if (rConcurso >= currentConcurso) return false;
+
+            // Se tiver filtro de data, deve respeitar
+            if (filterDateObj) {
+              const pr = r.data.split('/');
+              const rDate = new Date(pr[2], pr[1]-1, pr[0]);
+              rDate.setHours(0, 0, 0, 0);
+              if (rDate < filterDateObj) return false;
+            }
+            return true;
+          });
+
+          this.previousGamesCount = pastGames.length;
+
+          // 3. Calcular Frequência baseada APENAS nesse passado
+          const counts = {};
+          pastGames.forEach(j => j.dezenas.forEach(b => {
+            if (!counts[b]) counts[b] = 0;
+            counts[b]++;
+          }));
+
+          // Garante que os números do jogo atual existam no mapa (mesmo se for a 1ª vez saindo)
+          row.dezenas.forEach(n => {
+            if (!counts[n]) counts[n] = 0;
+          });
+
+          // 4. Gerar Cores (Recalcula Min/Max localmente para essa amostra)
+          const vals = Object.values(counts);
+          const min = Math.min(...vals);
+          const max = Math.max(...vals);
+          const range = max - min || 1;
+
+          const getColor = (val) => {
+            const r = (val - min) / range;
+            let bg, txt;
+            if (r < 0.5) {
+              const lr = r / 0.5;
+              bg = `rgb(255, ${Math.round(255*lr)}, ${Math.round(255*lr)})`;
+            } else {
+              const lr = (r - 0.5) / 0.5;
+              bg = `rgb(${Math.round(255*(1-lr))}, ${Math.round(255-(75*lr))}, ${Math.round(255*(1-lr))})`;
+            }
+            txt = (r < 0.2 || r > 0.8) ? 'white': 'black';
+            return {
+              backgroundColor: bg,
+              color: txt
+            };
+          };
+
+          // 5. Montar Objeto de Detalhes
+          const nums = row.dezenas.map(n => parseInt(n));
+          const primosList = [2,
+            3,
+            5,
+            7,
+            11,
+            13,
+            17,
+            19,
+            23,
+            29,
+            31,
+            37,
+            41,
+            43,
+            47,
+            53,
+            59,
+            61,
+            67,
+            71,
+            73,
+            79];
+
+          this.selectedDetails = {
+            concurso: row.concurso,
+            data: row.data,
+            sum: nums.reduce((a, b)=>a+b, 0),
+            even: nums.filter(n => n%2 === 0).length,
+            primes: nums.filter(n => primosList.includes(n)).length,
+            numbersWithColor: row.dezenas.map(n => ({
+              val: n,
+              style: getColor(counts[n] || 0)
+            }))
+          };
+
+          // Abre o Modal
+          if (!this.detailsModal) this.detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+          this.detailsModal.show();
+        },
+
         getNumberStyle(numeroStr) {
           // Procura o número na tabela de frequência já calculada
           if (!this.frequencyTable) return {};
@@ -645,7 +866,218 @@
             }
           },
             50);
+        },
+
+        openSimulation(row) {
+          // 1. Preparar o terreno (Mesma lógica de filtrar passado)
+          const currentConcurso = parseInt(row.concurso);
+          let filterDateObj = null;
+          if (this.filterStartDate) {
+            const p = this.filterStartDate.split('-');
+            filterDateObj = new Date(p[0], p[1]-1, p[2]);
+            filterDateObj.setHours(0, 0, 0, 0);
+          }
+          const pastGames = this.results.filter(r => {
+            const rConcurso = parseInt(r.concurso);
+            if (rConcurso >= currentConcurso) return false;
+            if (filterDateObj) {
+              const pr = r.data.split('/');
+              const rDate = new Date(pr[2], pr[1]-1, pr[0]);
+              rDate.setHours(0, 0, 0, 0);
+              if (rDate < filterDateObj) return false;
+            }
+            return true;
+          });
+
+          // 2. Calcular Frequência Histórica e Quintis
+          const counts = {};
+          pastGames.forEach(j => j.dezenas.forEach(b => {
+            counts[b] = (counts[b] || 0) + 1
+          }));
+
+          // Se não tiver histórico suficiente, usa aleatório puro, senão usa frequência
+          let sortedNums;
+          if (pastGames.length > 0) {
+            // Ordena 1-80 por frequência
+            const allNums = Array.from({
+              length: 80
+            }, (_, i)=>(i+1).toString().padStart(2, '0'));
+            sortedNums = allNums.sort((a, b) => (counts[b] || 0) - (counts[a] || 0)); // Quente pro Frio
+          } else {
+            sortedNums = Array.from({
+              length: 80
+            }, (_, i)=>(i+1).toString().padStart(2, '0'));
+          }
+
+          // Cria os 5 grupos (Quintis)
+          const chunks = [];
+          for (let i = 0; i < 5; i++) chunks.push(sortedNums.slice(i*16, (i+1)*16));
+
+          // 3. Analisar o Jogo Alvo para descobrir o "DNA" dele
+          const targetNums = row.dezenas.map(n => parseInt(n)); // Inteiros para cálculos
+          const targetSet = new Set(targetNums);
+
+          const sum = targetNums.reduce((a, b)=>a+b, 0);
+          const even = targetNums.filter(n => n%2 === 0).length;
+          const primesList = [2,
+            3,
+            5,
+            7,
+            11,
+            13,
+            17,
+            19,
+            23,
+            29,
+            31,
+            37,
+            41,
+            43,
+            47,
+            53,
+            59,
+            61,
+            67,
+            71,
+            73,
+            79];
+          const primes = targetNums.filter(n => primesList.includes(n)).length;
+
+          // Descobre o Padrão de Quintis (Quantos números o alvo pegou de cada grupo?)
+          // Ex: pattern = [2, 1, 1, 0, 1] (2 do grupo 1, 1 do grupo 2...)
+          const quintilePattern = [0,
+            0,
+            0,
+            0,
+            0];
+          targetNums.forEach(n => {
+            const strN = n.toString().padStart(2, '0');
+            // Acha em qual chunk esse número está
+            const chunkIndex = chunks.findIndex(chunk => chunk.includes(strN));
+            if (chunkIndex !== -1) quintilePattern[chunkIndex]++;
+          });
+
+          // Configura Estado Inicial
+          this.simState = {
+            running: true,
+            attempts: 0,
+            startTime: Date.now(),
+            elapsedTime: '00:00',
+            targetGame: {
+              concurso: row.concurso,
+              dezenas: row.dezenas,
+              sum, even, primes
+            },
+            bestTry: ['..', '..', '..', '..', '..'],
+            quintilePattern: quintilePattern,
+            chunks: chunks // Passamos os grupos ordenados
+          };
+
+          if (!this.simModal) this.simModal = new bootstrap.Modal(document.getElementById('simModal'));
+          this.simModal.show();
+
+          // Inicia o Loop
+          this.runSimLoop();
+        },
+
+        runSimLoop() {
+          if (!this.simState.running) return;
+
+          const {
+            chunks,
+            quintilePattern,
+            targetGame
+          } = this.simState;
+          const targetStr = targetGame.dezenas.join(',');
+          const primesList = [2,
+            3,
+            5,
+            7,
+            11,
+            13,
+            17,
+            19,
+            23,
+            29,
+            31,
+            37,
+            41,
+            43,
+            47,
+            53,
+            59,
+            61,
+            67,
+            71,
+            73,
+            79];
+
+          // Executa em blocos para não travar a UI (faz 2000 tentativas por frame)
+          let batch = 0;
+          while (batch < 2000) {
+            batch++;
+            this.simState.attempts++;
+
+            // 1. Gerar Jogo baseado no Padrão de Quintis
+            let candidate = [];
+            // Para cada grupo (0 a 4), pega a quantidade exata que o jogo alvo usou
+            for (let i = 0; i < 5; i++) {
+              const countNeeded = quintilePattern[i];
+              if (countNeeded > 0) {
+                const chunk = chunks[i]; // Grupo correspondente (ex: os 16 mais quentes)
+                // Sorteia 'countNeeded' números desse grupo sem repetir
+                const picked = [];
+                while (picked.length < countNeeded) {
+                  const rnd = chunk[Math.floor(Math.random() * chunk.length)];
+                  if (!picked.includes(rnd)) picked.push(rnd);
+                }
+                candidate.push(...picked);
+              }
+            }
+
+            // Ordena para comparar
+            candidate.sort((a, b) => parseInt(a) - parseInt(b));
+
+            // --- FILTROS RÍGIDOS (Aqui validamos se bate com a "informação privilegiada") ---
+
+            // A. Soma Exata
+            const sum = candidate.reduce((a, b)=>a+parseInt(b), 0);
+            if (sum !== targetGame.sum) continue;
+
+            // B. Pares Exatos
+            const evens = candidate.filter(n => parseInt(n)%2 === 0).length;
+            if (evens !== targetGame.even) continue;
+
+            // C. Primos Exatos
+            const primes = candidate.filter(n => primesList.includes(parseInt(n))).length;
+            if (primes !== targetGame.primes) continue;
+
+            // Se passou por tudo, é um jogo válido estatisticamente.
+            // D. É o vencedor?
+            this.simState.bestTry = candidate; // Atualiza visual
+            if (candidate.join(',') === targetStr) {
+              this.simState.running = false;
+              alert(`ACERTOU!\nTentativas: ${this.simState.attempts.toLocaleString()}\nTempo: ${this.simState.elapsedTime}`);
+              return;
+            }
+          }
+
+          // Atualiza tempo
+          const diff = Math.floor((Date.now() - this.simState.startTime) / 1000);
+          const m = Math.floor(diff / 60).toString().padStart(2, '0');
+          const s = (diff % 60).toString().padStart(2, '0');
+          this.simState.elapsedTime = `${m}:${s}`;
+
+          // Próximo frame
+          if (this.simState.running) {
+            requestAnimationFrame(this.runSimLoop);
+          }
+        },
+
+        stopSim() {
+          this.simState.running = false;
         }
+
 
       }
     }).mount('#app');
