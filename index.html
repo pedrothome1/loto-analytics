@@ -81,35 +81,82 @@
     </div>
 
     <div class="modal fade" id="statsModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              <i class="bi bi-bar-chart-line"></i> Par vs Ímpar
+              <i class="bi bi-bar-chart-line"></i> Estatísticas
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-          <div class="modal-body">
 
+          <div class="modal-body">
             <p class="text-muted small mb-3">
-              Analisando <strong>{{ sortedResults.length }}</strong> concursos filtrados.
+              Baseado em <strong>{{ sortedResults.length }}</strong> concursos filtrados.
             </p>
 
-            <div v-for="(stat, index) in parImparStats" :key="index" class="mb-3">
-              <div class="d-flex justify-content-between mb-1">
-                <span class="fw-bold">{{ stat.label }}</span>
-                <span>{{ stat.count }} jogos ({{ stat.percent }}%)</span>
-              </div>
+            <ul class="nav nav-tabs mb-3" id="statsTab" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="parimpar-tab" data-bs-toggle="tab" data-bs-target="#parimpar-content" type="button" role="tab">Par/Ímpar</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="primos-tab" data-bs-toggle="tab" data-bs-target="#primos-content" type="button" role="tab">Primos</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="dezenas-tab" data-bs-toggle="tab" data-bs-target="#dezenas-content" type="button" role="tab">Casas Decimais</button>
+              </li>
+            </ul>
 
-              <div class="progress" style="height: 10px;">
-                <div class="progress-bar"
-                  role="progressbar"
-                  :style="{ width: stat.percent + '%' }"
-                  :class="getProgressBarColor(stat.percent)">
+            <div class="tab-content" id="statsTabContent">
+
+              <div class="tab-pane fade show active" id="parimpar-content" role="tabpanel">
+                <div v-for="(stat, index) in parImparStats" :key="index" class="mb-3">
+                  <div class="d-flex justify-content-between mb-1">
+                    <span class="fw-bold">{{ stat.label }}</span>
+                    <span>{{ stat.count }} jogos ({{ stat.percent }}%)</span>
+                  </div>
+                  <div class="progress" style="height: 10px;">
+                    <div class="progress-bar" :style="{ width: stat.percent + '%' }" :class="getProgressBarColor(stat.percent)"></div>
+                  </div>
                 </div>
               </div>
-            </div>
 
+              <div class="tab-pane fade" id="primos-content" role="tabpanel">
+                <div v-for="(stat, index) in primosStats" :key="index" class="mb-3">
+                  <div class="d-flex justify-content-between mb-1">
+                    <span class="fw-bold">{{ stat.label }}</span>
+                    <span>{{ stat.count }} jogos ({{ stat.percent }}%)</span>
+                  </div>
+                  <div class="progress" style="height: 10px;">
+                    <div class="progress-bar bg-warning" :style="{ width: stat.percent + '%' }"></div>
+                  </div>
+                </div>
+                <div class="alert alert-light mt-3 small text-muted">
+                  * Primos até 80: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31...
+                </div>
+              </div>
+
+              <div class="tab-pane fade" id="dezenas-content" role="tabpanel">
+                <p class="small text-muted">
+                  Frequência total de aparições das dezenas (ex: quantos números da casa dos 20 saíram no total).
+                </p>
+
+                <div v-for="(stat, index) in decadeStats" :key="index" class="mb-2">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="badge bg-secondary" style="width: 40px">{{ stat.label }}</span>
+                    <div class="flex-grow-1 mx-2">
+                      <div class="progress" style="height: 15px;">
+                        <div class="progress-bar bg-info"
+                          :style="{ width: (stat.count / maxDecadeCount * 100) + '%' }">
+                        </div>
+                      </div>
+                    </div>
+                    <span class="small fw-bold">{{ stat.count }}</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
@@ -117,6 +164,7 @@
         </div>
       </div>
     </div>
+
 
     <div class="container">
 
@@ -209,7 +257,6 @@
             });
           }
 
-          // Ordenação
           return listaFiltrada.sort((a, b) => {
             const numA = parseInt(a.concurso);
             const numB = parseInt(b.concurso);
@@ -217,44 +264,124 @@
           });
         },
 
-        // NOVA COMPUTED PROPERTY: ESTATÍSTICAS
+        // --- ESTATÍSTICA 1: PAR / ÍMPAR ---
         parImparStats() {
           if (this.sortedResults.length === 0) return [];
-
           const stats = {};
           const totalJogos = this.sortedResults.length;
 
-          // Processa cada jogo
           this.sortedResults.forEach(jogo => {
-            // Conta quantos pares tem nesse jogo
-            // parseInt é vital aqui pois as bolas são strings
             const pares = jogo.dezenas.filter(num => parseInt(num) % 2 === 0).length;
             const impares = jogo.dezenas.length - pares;
-
-            // Cria uma chave única, ex: "2-3" (2 pares, 3 ímpares)
             const chave = `${pares} Pares / ${impares} Ímpares`;
 
-            // Incrementa contador
-            if (!stats[chave]) {
-              stats[chave] = {
-                count: 0,
-                pares: pares
-              }; // guardamos 'pares' para ordenar depois
-            }
+            if (!stats[chave]) stats[chave] = {
+              count: 0,
+              pares: pares
+            };
             stats[chave].count++;
           });
 
-          // Transforma o objeto em array para exibir na tela
           return Object.keys(stats).map(key => {
             return {
               label: key,
               count: stats[key].count,
-              pares: stats[key].pares,
-              percent: ((stats[key].count / totalJogos) * 100).toFixed(1)
+              percent: ((stats[key].count / totalJogos) * 100).toFixed(1),
+              pares: stats[key].pares
             };
-          }).sort((a, b) => a.pares - b.pares); // Ordena de 0 pares até 5 pares
+          }).sort((a, b) => a.pares - b.pares);
+        },
+
+        // --- ESTATÍSTICA 2: NÚMEROS PRIMOS ---
+        primosStats() {
+          if (this.sortedResults.length === 0) return [];
+
+          // Lista de primos até 80 (para Quina)
+          const primos = [2,
+            3,
+            5,
+            7,
+            11,
+            13,
+            17,
+            19,
+            23,
+            29,
+            31,
+            37,
+            41,
+            43,
+            47,
+            53,
+            59,
+            61,
+            67,
+            71,
+            73,
+            79];
+          const stats = {};
+          const totalJogos = this.sortedResults.length;
+
+          this.sortedResults.forEach(jogo => {
+            // Conta quantos números sorteados estão na lista de primos
+            const qtdPrimos = jogo.dezenas.filter(num => primos.includes(parseInt(num))).length;
+
+            const chave = qtdPrimos === 1 ? `1 Primo`: `${qtdPrimos} Primos`;
+
+            if (!stats[chave]) stats[chave] = {
+              count: 0,
+              qtd: qtdPrimos
+            };
+            stats[chave].count++;
+          });
+
+          return Object.keys(stats).map(key => {
+            return {
+              label: key,
+              count: stats[key].count,
+              percent: ((stats[key].count / totalJogos) * 100).toFixed(1),
+              qtd: stats[key].qtd
+            };
+          }).sort((a, b) => a.qtd - b.qtd);
+        },
+
+        // --- ESTATÍSTICA 3: POR DÉCADA (0x, 1x...) ---
+        decadeStats() {
+          if (this.sortedResults.length === 0) return [];
+
+          // Cria um array de 9 posições (0 a 8) preenchido com zeros
+          // Índice 0 = 01-09, Índice 1 = 10-19, ..., Índice 8 = 80
+          const counts = Array(9).fill(0);
+
+          this.sortedResults.forEach(jogo => {
+            jogo.dezenas.forEach(bola => {
+              const num = parseInt(bola);
+              // Math.floor(15 / 10) = 1 (Casa do 10)
+              // Math.floor(05 / 10) = 0 (Casa do 0)
+              const decada = Math.floor(num / 10);
+              if (counts[decada] !== undefined) {
+                counts[decada]++;
+              }
+            });
+          });
+
+          return counts.map((count,
+            index) => {
+            return {
+              label: index + "x", // Ex: 0x, 1x
+              count: count
+            };
+          });
+        },
+
+        // Auxiliar para calcular a barra de progresso das décadas
+        maxDecadeCount() {
+          if (this.decadeStats.length === 0) return 1;
+          // Retorna o maior valor encontrado para usar como base 100% da barra
+          return Math.max(...this.decadeStats.map(d => d.count));
         }
       },
+
       methods: {
         toggleSort() {
           this.sortOrder = this.sortOrder === 'asc' ? 'desc': 'asc';
