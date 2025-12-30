@@ -97,7 +97,14 @@
 
             <ul class="nav nav-tabs mb-3" id="statsTab" role="tablist">
               <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="parimpar-tab" data-bs-toggle="tab" data-bs-target="#parimpar-content" type="button" role="tab">Par/Ímpar</button>
+                <button class="nav-link active" id="frequencia-tab" data-bs-toggle="tab" data-bs-target="#frequencia-content" type="button" role="tab">Por Número</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="soma-tab" data-bs-toggle="tab" data-bs-target="#soma-content" type="button" role="tab">Soma</button>
+              </li>
+
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="parimpar-tab" data-bs-toggle="tab" data-bs-target="#parimpar-content" type="button" role="tab">Par/Ímpar</button>
               </li>
               <li class="nav-item" role="presentation">
                 <button class="nav-link" id="primos-tab" data-bs-toggle="tab" data-bs-target="#primos-content" type="button" role="tab">Primos</button>
@@ -109,7 +116,63 @@
 
             <div class="tab-content" id="statsTabContent">
 
-              <div class="tab-pane fade show active" id="parimpar-content" role="tabpanel">
+              <div class="tab-pane fade show active" id="frequencia-content" role="tabpanel">
+                <div class="alert alert-light small py-1 px-2 mb-2 border">
+                  <i class="bi bi-info-circle"></i> Clique no cabeçalho para ordenar.
+                </div>
+
+                <div style="max-height: 400px; overflow-y: auto;">
+                  <table class="table table-bordered table-sm text-center align-middle">
+                    <thead class="table-light sticky-top" style="top: 0; z-index: 2;">
+                      <tr>
+                        <th @click="sortFrequency('numero')" style="cursor: pointer;">
+                          Dezena
+                          <i class="bi ms-1" :class="freqSortColumn === 'numero' ? (freqSortOrder === 'asc' ? 'bi-caret-up-fill' : 'bi-caret-down-fill') : 'bi-filter'"></i>
+                        </th>
+                        <th @click="sortFrequency('count')" style="cursor: pointer;">
+                          Frequência
+                          <i class="bi ms-1" :class="freqSortColumn === 'count' ? (freqSortOrder === 'asc' ? 'bi-caret-up-fill' : 'bi-caret-down-fill') : 'bi-filter'"></i>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in frequencyTable" :key="row.numero">
+                        <td class="fw-bold">{{ row.numero }}</td>
+                        <td :style="row.style">
+                          {{ row.count }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="tab-pane fade" id="soma-content" role="tabpanel">
+                <div class="alert alert-light small py-2 border mb-3">
+                  <i class="bi bi-info-circle-fill text-primary"></i> A maioria dos sorteios ocorre na "zona central" (Curva de Sino).
+                </div>
+
+                <div v-for="(stat, index) in sumStats" :key="index" class="mb-2">
+                  <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.9rem;">
+                    <span class="badge bg-light text-dark border" style="width: 80px;">{{ stat.label }}</span>
+
+                    <div class="flex-grow-1 mx-2">
+                      <div class="progress" style="height: 18px;">
+                        <div class="progress-bar"
+                          :class="stat.percentTotal > 10 ? 'bg-success' : 'bg-secondary'"
+                          :style="{ width: stat.percentBarra + '%' }">
+                          <span v-if="stat.percentBarra > 20" style="font-size: 0.75rem">{{ stat.percentTotal }}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <span class="fw-bold text-end" style="min-width: 40px;">{{ stat.count }}</span>
+                  </div>
+                </div>
+              </div>
+
+
+              <div class="tab-pane fade" id="parimpar-content" role="tabpanel">
                 <div v-for="(stat, index) in parImparStats" :key="index" class="mb-3">
                   <div class="d-flex justify-content-between mb-1">
                     <span class="fw-bold">{{ stat.label }}</span>
@@ -131,27 +194,21 @@
                     <div class="progress-bar bg-warning" :style="{ width: stat.percent + '%' }"></div>
                   </div>
                 </div>
-                <div class="alert alert-light mt-3 small text-muted">
-                  * Primos até 80: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31...
-                </div>
               </div>
 
               <div class="tab-pane fade" id="dezenas-content" role="tabpanel">
                 <p class="small text-muted">
-                  Frequência total de aparições das dezenas (ex: quantos números da casa dos 20 saíram no total).
+                  Frequência total de aparições das dezenas.
                 </p>
-
                 <div v-for="(stat, index) in decadeStats" :key="index" class="mb-2">
                   <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="badge bg-secondary" style="width: 40px">{{ stat.label }}</span>
+                    <span class="badge bg-secondary" style="width: 65px">{{ stat.label }}</span>
                     <div class="flex-grow-1 mx-2">
                       <div class="progress" style="height: 15px;">
-                        <div class="progress-bar bg-info"
-                          :style="{ width: (stat.count / maxDecadeCount * 100) + '%' }">
-                        </div>
+                        <div class="progress-bar bg-info" :style="{ width: (stat.count / maxDecadeCount * 100) + '%' }"></div>
                       </div>
                     </div>
-                    <span class="small fw-bold">{{ stat.count }}</span>
+                    <span class="small fw-bold text-end" style="min-width: 40px;">{{ stat.count }}</span>
                   </div>
                 </div>
               </div>
@@ -164,6 +221,7 @@
         </div>
       </div>
     </div>
+
 
 
     <div class="container">
@@ -236,14 +294,17 @@
           loading: false,
           results: [],
           sortOrder: 'desc',
-          filterStartDate: ''
+          filterStartDate: '',
+          // NOVOS DADOS PARA O ORDENADOR DA TABELA DE FREQUÊNCIA
+          freqSortColumn: 'count', // Começa ordenando por quantidade
+          freqSortOrder: 'desc' // Do maior para o menor
         }
       },
       computed: {
         sortedResults() {
+          // ... (Sua lógica existente de filtro e ordenação principal) ...
           let listaFiltrada = [...this.results];
 
-          // Filtro de Data
           if (this.filterStartDate) {
             const partesFiltro = this.filterStartDate.split('-');
             const dataFiltro = new Date(partesFiltro[0], partesFiltro[1] - 1, partesFiltro[2]);
@@ -264,39 +325,30 @@
           });
         },
 
-        // --- ESTATÍSTICA 1: PAR / ÍMPAR ---
+        // --- COMPUTED PARA ESTATÍSTICAS EXISTENTES (Mantenha igual) ---
         parImparStats() {
           if (this.sortedResults.length === 0) return [];
           const stats = {};
           const totalJogos = this.sortedResults.length;
-
           this.sortedResults.forEach(jogo => {
             const pares = jogo.dezenas.filter(num => parseInt(num) % 2 === 0).length;
             const impares = jogo.dezenas.length - pares;
             const chave = `${pares} Pares / ${impares} Ímpares`;
-
             if (!stats[chave]) stats[chave] = {
               count: 0,
               pares: pares
             };
             stats[chave].count++;
           });
-
-          return Object.keys(stats).map(key => {
-            return {
-              label: key,
-              count: stats[key].count,
-              percent: ((stats[key].count / totalJogos) * 100).toFixed(1),
-              pares: stats[key].pares
-            };
-          }).sort((a, b) => a.pares - b.pares);
+          return Object.keys(stats).map(key => ({
+            label: key, count: stats[key].count,
+            percent: ((stats[key].count / totalJogos) * 100).toFixed(1),
+            pares: stats[key].pares
+          })).sort((a, b) => a.pares - b.pares);
         },
 
-        // --- ESTATÍSTICA 2: NÚMEROS PRIMOS ---
         primosStats() {
           if (this.sortedResults.length === 0) return [];
-
-          // Lista de primos até 80 (para Quina)
           const primos = [2,
             3,
             5,
@@ -321,117 +373,226 @@
             79];
           const stats = {};
           const totalJogos = this.sortedResults.length;
-
           this.sortedResults.forEach(jogo => {
-            // Conta quantos números sorteados estão na lista de primos
             const qtdPrimos = jogo.dezenas.filter(num => primos.includes(parseInt(num))).length;
-
             const chave = qtdPrimos === 1 ? `1 Primo`: `${qtdPrimos} Primos`;
-
             if (!stats[chave]) stats[chave] = {
               count: 0,
               qtd: qtdPrimos
             };
             stats[chave].count++;
           });
-
-          return Object.keys(stats).map(key => {
-            return {
-              label: key,
-              count: stats[key].count,
-              percent: ((stats[key].count / totalJogos) * 100).toFixed(1),
-              qtd: stats[key].qtd
-            };
-          }).sort((a, b) => a.qtd - b.qtd);
+          return Object.keys(stats).map(key => ({
+            label: key, count: stats[key].count,
+            percent: ((stats[key].count / totalJogos) * 100).toFixed(1),
+            qtd: stats[key].qtd
+          })).sort((a, b) => a.qtd - b.qtd);
         },
 
-        // --- ESTATÍSTICA 3: POR DÉCADA (0x, 1x...) ---
         decadeStats() {
           if (this.sortedResults.length === 0) return [];
-
-          // Cria um array de 9 posições (0 a 8) preenchido com zeros
-          // Índice 0 = 01-09, Índice 1 = 10-19, ..., Índice 8 = 80
           const counts = Array(9).fill(0);
-
           this.sortedResults.forEach(jogo => {
             jogo.dezenas.forEach(bola => {
               const num = parseInt(bola);
-              // Math.floor(15 / 10) = 1 (Casa do 10)
-              // Math.floor(05 / 10) = 0 (Casa do 0)
               const decada = Math.floor(num / 10);
-              if (counts[decada] !== undefined) {
-                counts[decada]++;
-              }
+              if (counts[decada] !== undefined) counts[decada]++;
             });
           });
-
           return counts.map((count,
             index) => {
+            const inicio = index * 10;
+            const fim = inicio + 9;
             return {
-              label: index + "x", // Ex: 0x, 1x
-              count: count
+              label: `${inicio.toString().padStart(2,
+                '0')} - ${fim.toString().padStart(2,
+                '0')}`, count: count
             };
           });
         },
-
-        // Auxiliar para calcular a barra de progresso das décadas
         maxDecadeCount() {
           if (this.decadeStats.length === 0) return 1;
-          // Retorna o maior valor encontrado para usar como base 100% da barra
           return Math.max(...this.decadeStats.map(d => d.count));
-        }
-      },
+        },
 
+        // --- NOVA TABELA DE FREQUÊNCIA COM CORES ---
+        frequencyTable() {
+          if (this.sortedResults.length === 0) return [];
+
+          // 1. Contagem
+          const counts = {};
+          // Inicializa todos os números possíveis (1 a 80 para Quina) para garantir que apareçam mesmo se zero
+          for (let i = 1; i <= 80; i++) {
+            const key = i.toString().padStart(2, '0');
+            counts[key] = 0;
+          }
+
+          this.sortedResults.forEach(jogo => {
+            jogo.dezenas.forEach(bola => {
+              if (counts[bola] !== undefined) counts[bola]++;
+            });
+          });
+
+          // 2. Determina Min e Max para a escala de cores
+          const values = Object.values(counts);
+          const min = Math.min(...values);
+          const max = Math.max(...values);
+          const range = max - min || 1; // Evita divisão por zero
+
+          // 3. Monta o array
+          let tableData = Object.keys(counts).map(num => {
+            const val = counts[num];
+
+            // Cálculo da Cor (Vermelho -> Branco -> Verde)
+            let r, g, b;
+            // Normaliza valor entre 0 e 1
+            const ratio = (val - min) / range;
+
+            if (ratio < 0.5) {
+              // Metade inferior: Vermelho (255,0,0) até Branco (255,255,255)
+              // Ajuste para 0 a 1 dentro dessa metade
+              const localRatio = ratio / 0.5;
+              r = 255;
+              g = Math.round(255 * localRatio);
+              b = Math.round(255 * localRatio);
+            } else {
+              // Metade superior: Branco (255,255,255) até Verde (0,180,0)
+              const localRatio = (ratio - 0.5) / 0.5;
+              r = Math.round(255 * (1 - localRatio));
+              g = Math.round(255 - (75 * localRatio)); // 255 até 180
+              b = Math.round(255 * (1 - localRatio));
+            }
+
+            // Se o fundo for muito escuro (verde forte ou vermelho forte), texto branco
+            // Simplificação: se ratio < 0.2 ou ratio > 0.8, texto branco
+            const textColor = (ratio < 0.2 || ratio > 0.8) ? 'white': 'black';
+
+            return {
+              numero: num,
+              count: val,
+              style: {
+                backgroundColor: `rgb(${r}, ${g}, ${b})`,
+                color: textColor
+              }
+            };
+          });
+
+          // 4. Ordenação Dinâmica
+          return tableData.sort((a, b) => {
+            let valA,
+            valB;
+
+            if (this.freqSortColumn === 'numero') {
+              valA = parseInt(a.numero);
+              valB = parseInt(b.numero);
+            } else {
+              valA = a.count;
+              valB = b.count;
+            }
+
+            if (this.freqSortOrder === 'asc') {
+              return valA - valB;
+            } else {
+              return valB - valA;
+            }
+          });
+        },
+
+        // --- ESTATÍSTICA 4: SOMA DAS DEZENAS ---
+        sumStats() {
+          if (this.sortedResults.length === 0) return [];
+
+          const stats = {};
+          const totalJogos = this.sortedResults.length;
+          const intervalo = 20; // Agrupar somas de 20 em 20 (ex: 100-119)
+
+          this.sortedResults.forEach(jogo => {
+            // Soma os 5 números do jogo
+            const soma = jogo.dezenas.reduce((acc, curr) => acc + parseInt(curr), 0);
+
+            // Define a faixa. Ex: Se soma é 155, Math.floor(155/20) = 7. 7*20 = 140.
+            const inicioFaixa = Math.floor(soma / intervalo) * intervalo;
+            const fimFaixa = inicioFaixa + intervalo - 1;
+
+            const label = `${inicioFaixa} - ${fimFaixa}`;
+
+            if (!stats[inicioFaixa]) {
+              stats[inicioFaixa] = {
+                label: label,
+                count: 0,
+                valInicio: inicioFaixa // Guardamos para ordenar depois
+              };
+            }
+            stats[inicioFaixa].count++;
+          });
+
+          // Encontrar o valor máximo para a barra de progresso ficar proporcional
+          const counts = Object.values(stats).map(s => s.count);
+          const maxCount = Math.max(...counts);
+
+          // Retorna array ordenado pelo valor da soma (do menor para o maior)
+          return Object.values(stats).map(item => {
+            return {
+              label: item.label,
+              count: item.count,
+              percentTotal: ((item.count / totalJogos) * 100).toFixed(1),
+              percentBarra: (item.count / maxCount) * 100 // Para o visual CSS
+            };
+          }).sort((a, b) => parseInt(a.label.split('-')[0]) - parseInt(b.label.split('-')[0]));
+        },
+
+      },
       methods: {
         toggleSort() {
           this.sortOrder = this.sortOrder === 'asc' ? 'desc': 'asc';
         },
+        // NOVO MÉTODO: Ordenar a tabela de frequência
+        sortFrequency(column) {
+          if (this.freqSortColumn === column) {
+            this.freqSortOrder = this.freqSortOrder === 'asc' ? 'desc': 'asc';
+          } else {
+            this.freqSortColumn = column;
+            this.freqSortOrder = 'desc'; // Padrão ao trocar de coluna
+          }
+        },
         limparFiltros() {
           this.filterStartDate = '';
         },
-        // Método visual para mudar cor da barra baseada na porcentagem
         getProgressBarColor(percent) {
-          if (percent > 30) return 'bg-success'; // Verde se for muito frequente
-          if (percent > 15) return 'bg-info'; // Azul se for comum
-          return 'bg-secondary'; // Cinza se for raro
+          if (percent > 30) return 'bg-success';
+          if (percent > 15) return 'bg-info';
+          return 'bg-secondary';
         },
         handleFileUpload(event) {
           const file = event.target.files[0];
           if (!file) return;
-
           this.loading = true;
           this.results = [];
-
           Papa.parse(file, {
             header: false,
             skipEmptyLines: true,
             complete: (parseResult) => {
               const rawData = parseResult.data.slice(1);
-
               this.results = rawData.map(row => {
                 if (row.length < 3) return null;
-
                 const qtdDezenas = 5;
-
                 const bolas = row.slice(2, 2 + qtdDezenas)
                 .filter(b => b && b.trim() !== "")
                 .map(b => parseInt(b))
                 .sort((a, b) => a - b)
                 .map(b => b.toString().padStart(2, '0'));
-
                 return {
                   concurso: row[0],
                   data: row[1],
                   dezenas: bolas
                 }
               }).filter(item => item !== null);
-
               this.loading = false;
             },
             error: (err) => {
               console.error("Erro:",
                 err);
-              alert("Erro ao ler o arquivo.");
+              alert("Erro ao ler CSV.");
               this.loading = false;
             }
           });
@@ -439,6 +600,7 @@
       }
     }).mount('#app');
   </script>
+
 
 
 
