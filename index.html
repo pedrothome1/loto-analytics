@@ -222,6 +222,7 @@
             <h5 class="modal-title"><i class="bi bi-cpu"></i> Quebrando a Banca</h5>
             <button type="button" class="btn-close btn-close-white" @click="stopSim" data-bs-dismiss="modal"></button>
           </div>
+
           <div class="modal-body text-center" v-if="simState.targetGame">
 
             <h6 class="text-muted small text-uppercase fw-bold">Alvo (Concurso {{ simState.targetGame.concurso }})</h6>
@@ -229,43 +230,83 @@
               <span v-for="n in simState.targetGame.dezenas" class="ball bg-success">{{ n }}</span>
             </div>
 
-            <h6 class="text-muted small text-uppercase fw-bold mt-4">Simulação (Tentativa Atual)</h6>
-            <div class="mb-2" style="min-height: 40px;">
-              <span v-for="n in simState.bestTry" class="ball" :class="simState.running ? 'bg-secondary' : 'bg-warning text-dark'">{{ n }}</span>
-            </div>
+            <div v-if="!simState.running && simState.attempts === 0" class="py-3">
+              <div class="card bg-light border-0 mb-3 text-start">
+                <div class="card-body">
+                  <label class="form-label fw-bold small">Escolha o Método:</label>
 
-            <div class="card bg-light border-0 mt-3">
-              <div class="card-body">
-                <div class="row text-center">
-                  <div class="col-6 border-end">
-                    <small class="text-muted d-block">Tentativas</small>
-                    <span class="fs-5 fw-bold font-monospace">{{ simState.attempts.toLocaleString() }}</span>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="simMode" id="modeSmart" value="smart" v-model="simState.mode">
+                    <label class="form-check-label small" for="modeSmart">
+                      <strong>Usar "Informação Privilegiada"</strong><br>
+                      <span class="text-muted">O robô sabe a soma, pares/ímpares, primos e padrão de frequência exatos deste sorteio. Tenta gerar jogos iguais.</span>
+                    </label>
                   </div>
-                  <div class="col-6">
-                    <small class="text-muted d-block">Tempo</small>
-                    <span class="fs-5 fw-bold font-monospace">{{ simState.elapsedTime }}</span>
+
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="simMode" id="modeRandom" value="random" v-model="simState.mode">
+                    <label class="form-check-label small" for="modeRandom">
+                      <strong>Aleatório Puro (Cego)</strong><br>
+                      <span class="text-muted">O robô não sabe nada. Apenas chuta 5 números aleatórios entre 1 e 80 repetidamente.</span>
+                    </label>
                   </div>
                 </div>
               </div>
+
+              <button class="btn btn-primary w-100 fw-bold" @click="startSim">
+                <i class="bi bi-play-fill"></i> INICIAR SIMULAÇÃO
+              </button>
             </div>
 
-            <div class="alert alert-info small mt-3 text-start py-2">
-              <i class="bi bi-robot"></i> O robô está gerando números respeitando <strong>exatamente</strong> os critérios deste sorteio:
-              <ul class="mb-0 ps-3 mt-1" style="font-size: 0.8rem;">
-                <li>Soma exata: <strong>{{ simState.targetGame.sum }}</strong></li>
-                <li>Pares/Ímpares exatos: <strong>{{ simState.targetGame.even }} / {{ 5 - simState.targetGame.even }}</strong></li>
-                <li>Primos exatos: <strong>{{ simState.targetGame.primes }}</strong></li>
-                <li>Distribuição de Frequência idêntica (Quintis).</li>
-              </ul>
+            <div v-else>
+              <h6 class="text-muted small text-uppercase fw-bold mt-2">Tentativa Atual</h6>
+              <div class="mb-2" style="min-height: 40px;">
+                <span v-for="n in simState.bestTry" class="ball" :class="simState.running ? 'bg-secondary' : 'bg-warning text-dark'">{{ n }}</span>
+              </div>
+
+              <div class="card bg-light border-0 mt-3">
+                <div class="card-body">
+                  <div class="row text-center">
+                    <div class="col-6 border-end">
+                      <small class="text-muted d-block">Tentativas</small>
+                      <span class="fs-5 fw-bold font-monospace">{{ simState.attempts.toLocaleString() }}</span>
+                    </div>
+                    <div class="col-6">
+                      <small class="text-muted d-block">Tempo</small>
+                      <span class="fs-5 fw-bold font-monospace">{{ simState.elapsedTime }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert alert-warning small mt-3 py-2" v-if="simState.mode === 'random'">
+                <i class="bi bi-exclamation-triangle"></i> Modo Aleatório é muito mais lento pois não filtra jogos "impossíveis".
+              </div>
             </div>
+
           </div>
-          <div class="modal-footer justify-content-center">
-            <button v-if="simState.running" class="btn btn-danger w-100" @click="stopSim">Parar Simulação</button>
-            <button v-else class="btn btn-dark w-100" data-bs-dismiss="modal">Fechar</button>
+          <div class="modal-footer justify-content-center gap-2">
+            <button v-if="simState.running" class="btn btn-danger w-100" @click="stopSim">
+              <i class="bi bi-stop-fill"></i> Parar Simulação
+            </button>
+
+            <template v-else-if="simState.attempts > 0">
+              <button class="btn btn-outline-secondary flex-grow-1" @click="resetSim">
+                <i class="bi bi-arrow-left"></i> Voltar
+              </button>
+              <button class="btn btn-dark flex-grow-1" data-bs-dismiss="modal">
+                Fechar
+              </button>
+            </template>
+
+            <button v-else class="btn btn-secondary w-100" data-bs-dismiss="modal">
+              Cancelar
+            </button>
           </div>
         </div>
       </div>
     </div>
+
 
     <div class="modal fade" id="filterModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
@@ -486,7 +527,9 @@
             bestTry: null, // A tentativa atual
             quintilePattern: [], // O padrão de quintis (ex: [2, 1, 1, 0, 1])
             chunks: [] // Os grupos de números usados na simulação
-          }
+          },
+          visitedBitmap: null, // Ocupará apenas 3MB
+          combTable: null, // Tabela para cálculo rápido de combinações
         }
       },
       watch: {
@@ -577,6 +620,43 @@
         }
       },
       methods: {
+        // Adicione em methods:
+        initBitSetSystem() {
+          // 1. Pré-calcula combinações (C(n, k)) para mapeamento rápido
+          // Precisamos de n até 80 e k até 5
+          this.combTable = Array(81).fill(0).map(() => Array(6).fill(0));
+
+          for (let i = 0; i <= 80; i++) {
+            this.combTable[i][0] = 1;
+            for (let j = 1; j <= Math.min(i, 5); j++) {
+              this.combTable[i][j] = this.combTable[i-1][j-1] + this.combTable[i-1][j];
+            }
+          }
+
+          // 2. Aloca memória para 24.040.016 bits (aprox 3MB)
+          // Se já existir, zera ele (fill 0) em vez de recriar para poupar Garbage Collection
+          if (!this.visitedBitmap) {
+            const totalCombinations = 24040016;
+            const byteSize = Math.ceil(totalCombinations / 8);
+            this.visitedBitmap = new Uint8Array(byteSize);
+          } else {
+            this.visitedBitmap.fill(0);
+          }
+        },
+
+        // Função que transforma [1, 2, 3, 4, 5] em um ID único (0 a 24 milhões)
+        getGameIndex(nums) {
+          // nums deve estar ordenado e ser inteiros (ex: [1, 2, 3, 4, 5])
+          // Fórmula: Combinatorial Number System
+          let idx = 0;
+          for (let i = 0; i < 5; i++) {
+            // Ajustamos para 0-based index na lógica combinatorial (n-1)
+            // Usamos a tabela pré-calculada: C(valor-1, posição+1)
+            idx += this.combTable[nums[i] - 1][i + 1];
+          }
+          return idx;
+        },
+
         openDetails(row) {
           const currentConcurso = parseInt(row.concurso);
 
@@ -754,7 +834,6 @@
           return p > 30?'bg-success': p > 15?'bg-info': 'bg-secondary';
         },
 
-        // --- NOVO: LÓGICA DO GERADOR ---
         openGenerator() {
           if (!this.generatorModal) this.generatorModal = new bootstrap.Modal(document.getElementById('generatorModal'));
           this.generateOptimizedGame();
@@ -869,7 +948,7 @@
         },
 
         openSimulation(row) {
-          // 1. Preparar o terreno (Mesma lógica de filtrar passado)
+          // 1. Preparar dados (Igual anterior)
           const currentConcurso = parseInt(row.concurso);
           let filterDateObj = null;
           if (this.filterStartDate) {
@@ -889,34 +968,25 @@
             return true;
           });
 
-          // 2. Calcular Frequência Histórica e Quintis
+          // 2. Calcular Frequência
           const counts = {};
           pastGames.forEach(j => j.dezenas.forEach(b => {
             counts[b] = (counts[b] || 0) + 1
           }));
-
-          // Se não tiver histórico suficiente, usa aleatório puro, senão usa frequência
-          let sortedNums;
-          if (pastGames.length > 0) {
-            // Ordena 1-80 por frequência
-            const allNums = Array.from({
+          let sortedNums = pastGames.length > 0
+          ? Array.from({
+            length: 80
+          },
+            (_, i)=>(i+1).toString().padStart(2, '0')).sort((a, b) => (counts[b] || 0) - (counts[a] || 0)): Array.from({
               length: 80
-            }, (_, i)=>(i+1).toString().padStart(2, '0'));
-            sortedNums = allNums.sort((a, b) => (counts[b] || 0) - (counts[a] || 0)); // Quente pro Frio
-          } else {
-            sortedNums = Array.from({
-              length: 80
-            }, (_, i)=>(i+1).toString().padStart(2, '0'));
-          }
+            },
+            (_, i)=>(i+1).toString().padStart(2, '0'));
 
-          // Cria os 5 grupos (Quintis)
           const chunks = [];
           for (let i = 0; i < 5; i++) chunks.push(sortedNums.slice(i*16, (i+1)*16));
 
-          // 3. Analisar o Jogo Alvo para descobrir o "DNA" dele
-          const targetNums = row.dezenas.map(n => parseInt(n)); // Inteiros para cálculos
-          const targetSet = new Set(targetNums);
-
+          // 3. Analisar Alvo
+          const targetNums = row.dezenas.map(n => parseInt(n));
           const sum = targetNums.reduce((a, b)=>a+b, 0);
           const even = targetNums.filter(n => n%2 === 0).length;
           const primesList = [2,
@@ -943,8 +1013,6 @@
             79];
           const primes = targetNums.filter(n => primesList.includes(n)).length;
 
-          // Descobre o Padrão de Quintis (Quantos números o alvo pegou de cada grupo?)
-          // Ex: pattern = [2, 1, 1, 0, 1] (2 do grupo 1, 1 do grupo 2...)
           const quintilePattern = [0,
             0,
             0,
@@ -952,33 +1020,41 @@
             0];
           targetNums.forEach(n => {
             const strN = n.toString().padStart(2, '0');
-            // Acha em qual chunk esse número está
             const chunkIndex = chunks.findIndex(chunk => chunk.includes(strN));
             if (chunkIndex !== -1) quintilePattern[chunkIndex]++;
           });
 
-          // Configura Estado Inicial
+          // 4. Configura Estado Inicial (SEM RODAR AINDA)
           this.simState = {
-            running: true,
+            running: false, // MUDANÇA: Começa parado
+            mode: 'smart', // MUDANÇA: Padrão inteligente
             attempts: 0,
-            startTime: Date.now(),
+            startTime: null,
             elapsedTime: '00:00',
             targetGame: {
-              concurso: row.concurso,
-              dezenas: row.dezenas,
-              sum, even, primes
+              concurso: row.concurso, dezenas: row.dezenas, sum, even, primes
             },
             bestTry: ['..', '..', '..', '..', '..'],
             quintilePattern: quintilePattern,
-            chunks: chunks // Passamos os grupos ordenados
+            chunks: chunks
           };
 
           if (!this.simModal) this.simModal = new bootstrap.Modal(document.getElementById('simModal'));
           this.simModal.show();
+        },
 
-          // Inicia o Loop
+        // NOVO MÉTODO PARA O BOTÃO "INICIAR"
+        startSim() {
+          this.simState.running = true;
+          this.simState.startTime = Date.now();
+          this.simState.attempts = 0;
+
+          // INICIA O SISTEMA DE 3MB
+          this.initBitSetSystem();
+
           this.runSimLoop();
         },
+
 
         runSimLoop() {
           if (!this.simState.running) return;
@@ -986,7 +1062,8 @@
           const {
             chunks,
             quintilePattern,
-            targetGame
+            targetGame,
+            mode
           } = this.simState;
           const targetStr = targetGame.dezenas.join(',');
           const primesList = [2,
@@ -1012,73 +1089,125 @@
             73,
             79];
 
-          // Executa em blocos para não travar a UI (faz 2000 tentativas por frame)
+          // Define o tamanho do lote por frame
+          // Modo aleatório é mais rápido de gerar, então processamos mais por vez
+          const batchSize = mode === 'random' ? 5000: 2000;
           let batch = 0;
-          while (batch < 2000) {
-            batch++;
-            this.simState.attempts++;
 
-            // 1. Gerar Jogo baseado no Padrão de Quintis
+          while (batch < batchSize) {
+            batch++;
+
             let candidate = [];
-            // Para cada grupo (0 a 4), pega a quantidade exata que o jogo alvo usou
-            for (let i = 0; i < 5; i++) {
-              const countNeeded = quintilePattern[i];
-              if (countNeeded > 0) {
-                const chunk = chunks[i]; // Grupo correspondente (ex: os 16 mais quentes)
-                // Sorteia 'countNeeded' números desse grupo sem repetir
-                const picked = [];
-                while (picked.length < countNeeded) {
-                  const rnd = chunk[Math.floor(Math.random() * chunk.length)];
-                  if (!picked.includes(rnd)) picked.push(rnd);
-                }
-                candidate.push(...picked);
+
+            // --- 1. GERAÇÃO DOS NÚMEROS ---
+            if (mode === 'random') {
+              // Modo Aleatório: Sorteia 5 números únicos de 1 a 80
+              while (candidate.length < 5) {
+                const rnd = Math.floor(Math.random() * 80) + 1;
+                if (!candidate.includes(rnd)) candidate.push(rnd);
               }
+              // Ordena numéricamente para o cálculo do índice funcionar
+              candidate.sort((a, b) => a - b);
+
+            } else {
+              // Modo Inteligente: Respeita os Quintis (Frequência)
+              for (let i = 0; i < 5; i++) {
+                const countNeeded = quintilePattern[i];
+                if (countNeeded > 0) {
+                  const chunk = chunks[i];
+                  const picked = [];
+                  while (picked.length < countNeeded) {
+                    const rnd = chunk[Math.floor(Math.random() * chunk.length)];
+                    // Garante unicidade dentro da seleção
+                    if (!picked.includes(rnd)) picked.push(rnd);
+                  }
+                  candidate.push(...picked);
+                }
+              }
+              candidate.sort((a, b) => parseInt(a) - parseInt(b));
             }
 
-            // Ordena para comparar
-            candidate.sort((a, b) => parseInt(a) - parseInt(b));
+            // --- 2. OTIMIZAÇÃO DE MEMÓRIA (BITSET) ---
+            // Calcula o ID único deste jogo (0 a 24 milhões)
+            const gameIndex = this.getGameIndex(candidate);
 
-            // --- FILTROS RÍGIDOS (Aqui validamos se bate com a "informação privilegiada") ---
+            // Localiza o bit exato na memória de 3MB
+            const byteIndex = Math.floor(gameIndex / 8);
+            const bitIndex = gameIndex % 8;
 
-            // A. Soma Exata
-            const sum = candidate.reduce((a, b)=>a+parseInt(b), 0);
-            if (sum !== targetGame.sum) continue;
+            // Se o bit já estiver ligado (1), já tentamos esse jogo. Pula.
+            if ((this.visitedBitmap[byteIndex] & (1 << bitIndex)) !== 0) {
+              continue;
+            }
 
-            // B. Pares Exatos
-            const evens = candidate.filter(n => parseInt(n)%2 === 0).length;
-            if (evens !== targetGame.even) continue;
+            // Marca como tentado (liga o bit)
+            this.visitedBitmap[byteIndex] |= (1 << bitIndex);
 
-            // C. Primos Exatos
-            const primes = candidate.filter(n => primesList.includes(parseInt(n))).length;
-            if (primes !== targetGame.primes) continue;
+            // Incrementa tentativas (agora garantidamente únicas)
+            this.simState.attempts++;
 
-            // Se passou por tudo, é um jogo válido estatisticamente.
-            // D. É o vencedor?
-            this.simState.bestTry = candidate; // Atualiza visual
-            if (candidate.join(',') === targetStr) {
+
+            // --- 3. FILTROS ESTATÍSTICOS (Apenas Modo Inteligente) ---
+            if (mode === 'smart') {
+              // Como sabemos o futuro, descartamos o que não bate com o alvo
+              const sum = candidate.reduce((a, b)=>a+parseInt(b), 0);
+              if (sum !== targetGame.sum) continue;
+
+              const evens = candidate.filter(n => parseInt(n)%2 === 0).length;
+              if (evens !== targetGame.even) continue;
+
+              const primes = candidate.filter(n => primesList.includes(parseInt(n))).length;
+              if (primes !== targetGame.primes) continue;
+            }
+
+
+            // --- 4. VERIFICAÇÃO DE VITÓRIA ---
+            // Formata para string ("01", "05"...) para comparar visualmente e com o alvo
+            const candidateFormatted = candidate.map(n => n.toString().padStart(2, '0'));
+
+            // Atualiza a visualização a cada 500 iterações (para não travar a tela)
+            if (batch % 500 === 0) this.simState.bestTry = candidateFormatted;
+
+            // Se acertou
+            if (candidateFormatted.join(',') === targetStr) {
+              this.simState.bestTry = candidateFormatted;
               this.simState.running = false;
-              alert(`ACERTOU!\nTentativas: ${this.simState.attempts.toLocaleString()}\nTempo: ${this.simState.elapsedTime}`);
-              return;
+
+              // Pequeno delay para a UI atualizar antes do alerta
+              setTimeout(() => {
+                alert(`ACERTOU (${mode === 'smart' ? 'Inteligente': 'Aleatório'})!\nJogos Únicos Testados: ${this.simState.attempts.toLocaleString()}\nTempo: ${this.simState.elapsedTime}`);
+              }, 10);
+              return; // Sai do loop e da função
             }
           }
 
-          // Atualiza tempo
+          // --- 5. ATUALIZAÇÃO DE TEMPO E LOOP ---
           const diff = Math.floor((Date.now() - this.simState.startTime) / 1000);
           const m = Math.floor(diff / 60).toString().padStart(2, '0');
           const s = (diff % 60).toString().padStart(2, '0');
           this.simState.elapsedTime = `${m}:${s}`;
 
-          // Próximo frame
+          // Chama o próximo quadro de animação
           if (this.simState.running) {
             requestAnimationFrame(this.runSimLoop);
           }
         },
 
+
         stopSim() {
           this.simState.running = false;
-        }
+        },
 
-
+        resetSim() {
+          this.simState.running = false;
+          this.simState.attempts = 0; // Isso faz voltar para a tela 1
+          this.simState.elapsedTime = '00:00';
+          this.simState.bestTry = ['..',
+            '..',
+            '..',
+            '..',
+            '..'];
+        },
       }
     }).mount('#app');
   </script>
