@@ -174,7 +174,7 @@
 
             <h6 class="text-muted small text-uppercase fw-bold">Alvo (Concurso {{ simState.targetGame.game }})</h6>
             <div class="mb-3">
-              <span v-for="n in simState.targetGame.numbers" class="ball bg-success">{{ n }}</span>
+              <span v-for="number in simState.targetGame.numbers" class="ball bg-success">{{ number }}</span>
             </div>
 
             <div v-if="!simState.running && simState.attempts === 0" class="py-3">
@@ -208,7 +208,7 @@
             <div v-else>
               <h6 class="text-muted small text-uppercase fw-bold mt-2">Tentativa Atual</h6>
               <div class="mb-2" style="min-height: 40px;">
-                <span v-for="n in simState.bestTry" class="ball" :class="simState.running ? 'bg-secondary' : 'bg-warning text-dark'">{{ n }}</span>
+                <span v-for="number in simState.bestTry" class="ball" :class="simState.running ? 'bg-secondary' : 'bg-warning text-dark'">{{ number }}</span>
               </div>
 
               <div class="card bg-light border-0 mt-3">

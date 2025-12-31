@@ -45,142 +45,176 @@ createApp({
   },
   computed: {
     sortedResults() {
-      let list = [...this.results];
+      let resultList = [...this.results];
+      
       if (this.filterStartDate) {
-        const p = this.filterStartDate.split('-');
-        const d = new Date(p[0], p[1] - 1, p[2]);
-        d.setHours(0, 0, 0, 0);
-        list = list.filter((r) => {
-          const pr = r.date.split('/');
-          const ds = new Date(pr[2], pr[1] - 1, pr[0]);
-          ds.setHours(0, 0, 0, 0);
-          return ds >= d;
+        const dateParts = this.filterStartDate.split('-');
+        const filterDateObject = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+        filterDateObject.setHours(0, 0, 0, 0);
+
+        resultList = resultList.filter((gameResult) => {
+          const resultDateParts = gameResult.date.split('/');
+          const resultDateObject = new Date(resultDateParts[2], resultDateParts[1] - 1, resultDateParts[0]);
+          resultDateObject.setHours(0, 0, 0, 0);
+          return resultDateObject >= filterDateObject;
         });
       }
-      return list.sort((a, b) => {
-        const nA = parseInt(a.game),
-          nB = parseInt(b.game);
-        return this.sortOrder === 'asc' ? nA - nB : nB - nA;
+
+      return resultList.sort((gameA, gameB) => {
+        const gameNumberA = parseInt(gameA.game);
+        const gameNumberB = parseInt(gameB.game);
+        return this.sortOrder === 'asc' ? gameNumberA - gameNumberB : gameNumberB - gameNumberA;
       });
     },
     totalPages() {
       return Math.ceil(this.sortedResults.length / this.pageSize);
     },
     paginatedResults() {
-      const s = (this.currentPage - 1) * this.pageSize;
-      return this.sortedResults.slice(s, s + this.pageSize);
+      const startIndex = (this.currentPage - 1) * this.pageSize;
+      return this.sortedResults.slice(startIndex, startIndex + this.pageSize);
     },
     frequencyTable() {
       if (this.sortedResults.length === 0) return [];
-      const c = {};
-      for (let i = 1; i <= 80; i++) c[i.toString().padStart(2, '0')] = 0;
-      this.sortedResults.forEach((j) =>
-        j.numbers.forEach((b) => {
-          if (c[b] !== undefined) c[b]++;
+      
+      const countsMap = {};
+      // Inicializa contagem para números de 01 a 80
+      for (let i = 1; i <= 80; i++) {
+          countsMap[i.toString().padStart(2, '0')] = 0;
+      }
+
+      this.sortedResults.forEach((gameResult) =>
+        gameResult.numbers.forEach((ballNumber) => {
+          if (countsMap[ballNumber] !== undefined) countsMap[ballNumber]++;
         }),
       );
 
-      const vals = Object.values(c);
-      const min = Math.min(...vals),
-        max = Math.max(...vals),
-        rng = max - min || 1;
+      const countValues = Object.values(countsMap);
+      const minCount = Math.min(...countValues);
+      const maxCount = Math.max(...countValues);
+      const range = maxCount - minCount || 1;
 
-      return Object.keys(c)
-        .map((n) => {
-          const v = c[n],
-            r = (v - min) / rng;
-          let color =
-            r < 0.5
-              ? `rgb(255, ${Math.round((255 * r) / 0.5)}, ${Math.round((255 * r) / 0.5)})`
-              : `rgb(${Math.round(255 * (1 - (r - 0.5) / 0.5))}, ${Math.round(255 - (75 * (r - 0.5)) / 0.5)}, ${Math.round(255 * (1 - (r - 0.5) / 0.5))})`;
+      return Object.keys(countsMap)
+        .map((numberKey) => {
+          const countValue = countsMap[numberKey];
+          const ratio = (countValue - minCount) / range;
+          
+          let color;
+          if (ratio < 0.5) {
+             // Gradiente para números menos frequentes (escala de branco para azul/verde claro)
+             const normalizedRatio = ratio / 0.5;
+             const greenBlue = Math.round(255 * normalizedRatio);
+             color = `rgb(255, ${greenBlue}, ${greenBlue})`;
+          } else {
+             // Gradiente para números mais frequentes (escala para cor mais escura/intensa)
+             const normalizedRatio = (ratio - 0.5) / 0.5;
+             const red = Math.round(255 * (1 - normalizedRatio));
+             const green = Math.round(255 - (75 * normalizedRatio));
+             const blue = Math.round(255 * (1 - normalizedRatio));
+             color = `rgb(${red}, ${green}, ${blue})`;
+          }
+
           return {
-            number: n,
-            count: v,
+            number: numberKey,
+            count: countValue,
             style: {
               backgroundColor: color,
-              color: r < 0.2 || r > 0.8 ? 'white' : 'black',
+              color: ratio < 0.2 || ratio > 0.8 ? 'white' : 'black',
             },
           };
         })
-        .sort((a, b) =>
-          this.freqSortOrder === 'asc'
-            ? this.freqSortColumn === 'number'
-              ? parseInt(a.number) - parseInt(b.number)
-              : a.count - b.count
-            : this.freqSortColumn === 'number'
-              ? parseInt(b.number) - parseInt(a.number)
-              : b.count - a.count,
-        );
+        .sort((itemA, itemB) => {
+          if (this.freqSortOrder === 'asc') {
+            return this.freqSortColumn === 'number'
+              ? parseInt(itemA.number) - parseInt(itemB.number)
+              : itemA.count - itemB.count;
+          } else {
+            return this.freqSortColumn === 'number'
+              ? parseInt(itemB.number) - parseInt(itemA.number)
+              : itemB.count - itemA.count;
+          }
+        });
     },
     evenOddStats() {
       return this.genericStats(
-        (j) => j.numbers.filter((n) => n % 2 === 0).length,
-        (p) => `${p} Pares / ${5 - p} Ímpares`,
-        'pares',
+        (gameResult) => gameResult.numbers.filter((n) => n % 2 === 0).length,
+        (evenCount) => `${evenCount} Pares / ${5 - evenCount} Ímpares`,
+        'evenCount',
       );
     },
     primeStats() {
-      const pr = [
+      const primeNumbersList = [
         2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67,
         71, 73, 79,
       ];
       return this.genericStats(
-        (j) => j.numbers.filter((n) => pr.includes(parseInt(n))).length,
-        (q) => (q === 1 ? '1 Primo' : `${q} Primos`),
-        'qty',
+        (gameResult) => gameResult.numbers.filter((n) => primeNumbersList.includes(parseInt(n))).length,
+        (primeCount) => (primeCount === 1 ? '1 Primo' : `${primeCount} Primos`),
+        'quantity',
       );
     },
     decadeStats() {
       if (!this.sortedResults.length) return [];
-      const c = Array(9).fill(0);
-      this.sortedResults.forEach((j) =>
-        j.numbers.forEach((b) => c[Math.floor(parseInt(b) / 10)]++),
+      
+      const decadeCounts = Array(9).fill(0);
+      
+      this.sortedResults.forEach((gameResult) =>
+        gameResult.numbers.forEach((ballNumber) => {
+            const decadeIndex = Math.floor(parseInt(ballNumber) / 10);
+            decadeCounts[decadeIndex]++;
+        }),
       );
-      return c.map((cnt, i) => ({
-        label: `${i * 10}-${i * 10 + 9}`
+      
+      return decadeCounts.map((count, index) => ({
+        label: `${index * 10}-${index * 10 + 9}`
           .replace(/^(\d)-/, '0$1-')
           .replace(/-(\d)$/, '-0$1'),
-        count: cnt,
+        count: count,
       }));
     },
     maxDecadeCount() {
       return Math.max(...(this.decadeStats.map((d) => d.count) || 1));
     },
     sumStats() {
-      const s = {};
-      const t = this.sortedResults.length;
-      this.sortedResults.forEach((j) => {
-        const sum = j.numbers.reduce((a, b) => a + parseInt(b), 0);
-        const k = Math.floor(sum / 20) * 20;
-        if (!s[k])
-          s[k] = {
-            label: `${k}-${k + 19}`,
+      const statsMap = {};
+      const totalGames = this.sortedResults.length;
+      
+      this.sortedResults.forEach((gameResult) => {
+        const sumTotal = gameResult.numbers.reduce((acc, curr) => acc + parseInt(curr), 0);
+        const intervalKey = Math.floor(sumTotal / 20) * 20;
+        
+        if (!statsMap[intervalKey])
+          statsMap[intervalKey] = {
+            label: `${intervalKey}-${intervalKey + 19}`,
             count: 0,
-            vi: k,
+            intervalStart: intervalKey,
           };
-        s[k].count++;
+        statsMap[intervalKey].count++;
       });
-      const mx = Math.max(...Object.values(s).map((v) => v.count));
-      return Object.values(s)
-        .map((i) => ({
-          ...i,
-          percentTotal: ((i.count / t) * 100).toFixed(1),
-          percentBar: (i.count / mx) * 100,
+
+      const maxFrequency = Math.max(...Object.values(statsMap).map((stat) => stat.count));
+      
+      return Object.values(statsMap)
+        .map((statItem) => ({
+          ...statItem,
+          percentTotal: ((statItem.count / totalGames) * 100).toFixed(1),
+          percentBar: (statItem.count / maxFrequency) * 100,
         }))
-        .sort((a, b) => a.vi - b.vi);
+        .sort((a, b) => a.intervalStart - b.intervalStart);
     },
   },
   methods: {
     initBitSetSystem() {
+      // combTable armazena combinações pré-calculadas
       this.combTable = Array(81)
         .fill(0)
         .map(() => Array(6).fill(0));
 
-      for (let i = 0; i <= 80; i++) {
-        this.combTable[i][0] = 1;
-        for (let j = 1; j <= Math.min(i, 5); j++) {
-          this.combTable[i][j] =
-            this.combTable[i - 1][j - 1] + this.combTable[i - 1][j];
+      // i representa o total de itens (n), j representa o tamanho do subconjunto (k)
+      for (let n = 0; n <= 80; n++) {
+        this.combTable[n][0] = 1;
+        for (let k = 1; k <= Math.min(n, 5); k++) {
+          this.combTable[n][k] =
+            this.combTable[n - 1][k - 1] + this.combTable[n - 1][k];
         }
       }
 
@@ -192,75 +226,82 @@ createApp({
         this.visitedBitmap.fill(0);
       }
     },
-    getGameIndex(nums) {
-      let idx = 0;
+    getGameIndex(numbersArray) {
+      let index = 0;
       for (let i = 0; i < 5; i++) {
-        idx += this.combTable[nums[i] - 1][i + 1];
+        // Usa a lógica combinatória para criar um índice único
+        index += this.combTable[numbersArray[i] - 1][i + 1];
       }
-      return idx;
+      return index;
     },
     openDetails(row) {
       const currentGame = parseInt(row.game);
 
       let filterDateObj = null;
       if (this.filterStartDate) {
-        const p = this.filterStartDate.split('-');
-        filterDateObj = new Date(p[0], p[1] - 1, p[2]);
+        const dateParts = this.filterStartDate.split('-');
+        filterDateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
         filterDateObj.setHours(0, 0, 0, 0);
       }
 
-      const pastGames = this.results.filter((r) => {
-        const rGame = parseInt(r.game);
+      const pastGames = this.results.filter((gameResult) => {
+        const resultGameNumber = parseInt(gameResult.game);
 
-        if (rGame >= currentGame) return false;
+        if (resultGameNumber >= currentGame) return false;
 
         if (filterDateObj) {
-          const pr = r.date.split('/');
-          const rDate = new Date(pr[2], pr[1] - 1, pr[0]);
-          rDate.setHours(0, 0, 0, 0);
-          if (rDate < filterDateObj) return false;
+          const resultDateParts = gameResult.date.split('/');
+          const resultDate = new Date(resultDateParts[2], resultDateParts[1] - 1, resultDateParts[0]);
+          resultDate.setHours(0, 0, 0, 0);
+          if (resultDate < filterDateObj) return false;
         }
         return true;
       });
 
       this.previousGamesCount = pastGames.length;
 
-      const counts = {};
-      pastGames.forEach((j) =>
-        j.numbers.forEach((b) => {
-          if (!counts[b]) counts[b] = 0;
-          counts[b]++;
+      const countsMap = {};
+      pastGames.forEach((gameResult) =>
+        gameResult.numbers.forEach((ballNumber) => {
+          if (!countsMap[ballNumber]) countsMap[ballNumber] = 0;
+          countsMap[ballNumber]++;
         }),
       );
 
-      row.numbers.forEach((n) => {
-        if (!counts[n]) counts[n] = 0;
+      // Garante que os números do jogo atual existam no mapa
+      row.numbers.forEach((numberStr) => {
+        if (!countsMap[numberStr]) countsMap[numberStr] = 0;
       });
 
-      const vals = Object.values(counts);
-      const min = Math.min(...vals);
-      const max = Math.max(...vals);
-      const range = max - min || 1;
+      const countValues = Object.values(countsMap);
+      const minCount = Math.min(...countValues);
+      const maxCount = Math.max(...countValues);
+      const range = maxCount - minCount || 1;
 
       const getColor = (val) => {
-        const r = (val - min) / range;
-        let bg, txt;
-        if (r < 0.5) {
-          const lr = r / 0.5;
-          bg = `rgb(255, ${Math.round(255 * lr)}, ${Math.round(255 * lr)})`;
+        const ratio = (val - minCount) / range;
+        let backgroundColor, textColor;
+        
+        if (ratio < 0.5) {
+          const normalizedRatio = ratio / 0.5;
+          const greenBlue = Math.round(255 * normalizedRatio);
+          backgroundColor = `rgb(255, ${greenBlue}, ${greenBlue})`;
         } else {
-          const lr = (r - 0.5) / 0.5;
-          bg = `rgb(${Math.round(255 * (1 - lr))}, ${Math.round(255 - 75 * lr)}, ${Math.round(255 * (1 - lr))})`;
+          const normalizedRatio = (ratio - 0.5) / 0.5;
+          const red = Math.round(255 * (1 - normalizedRatio));
+          const green = Math.round(255 - 75 * normalizedRatio);
+          const blue = Math.round(255 * (1 - normalizedRatio));
+          backgroundColor = `rgb(${red}, ${green}, ${blue})`;
         }
-        txt = r < 0.2 || r > 0.8 ? 'white' : 'black';
+        textColor = ratio < 0.2 || ratio > 0.8 ? 'white' : 'black';
         return {
-          backgroundColor: bg,
-          color: txt,
+          backgroundColor: backgroundColor,
+          color: textColor,
         };
       };
 
-      const nums = row.numbers.map((n) => parseInt(n));
-      const primeList = [
+      const numbersAsInt = row.numbers.map((n) => parseInt(n));
+      const primeNumbersList = [
         2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67,
         71, 73, 79,
       ];
@@ -268,12 +309,12 @@ createApp({
       this.selectedDetails = {
         game: row.game,
         date: row.date,
-        sum: nums.reduce((a, b) => a + b, 0),
-        even: nums.filter((n) => n % 2 === 0).length,
-        primes: nums.filter((n) => primeList.includes(n)).length,
+        sum: numbersAsInt.reduce((acc, curr) => acc + curr, 0),
+        even: numbersAsInt.filter((n) => n % 2 === 0).length,
+        primes: numbersAsInt.filter((n) => primeNumbersList.includes(n)).length,
         numbersWithColor: row.numbers.map((n) => ({
           val: n,
-          style: getColor(counts[n] || 0),
+          style: getColor(countsMap[n] || 0),
         })),
       };
 
@@ -285,46 +326,52 @@ createApp({
     },
     getNumberStyle(numberStr) {
       if (!this.frequencyTable) return {};
-      const found = this.frequencyTable.find(
+      const foundItem = this.frequencyTable.find(
         (item) => item.number === numberStr,
       );
 
-      return found ? found.style : {};
+      return foundItem ? foundItem.style : {};
     },
-    genericStats(countFn, labelFn, sortKey) {
+    genericStats(countFunction, labelFunction, sortKey) {
       if (!this.sortedResults.length) return [];
-      const s = {},
-        t = this.sortedResults.length;
-      this.sortedResults.forEach((j) => {
-        const v = countFn(j);
-        const k = labelFn(v);
-        if (!s[k])
-          s[k] = {
+      
+      const statsMap = {};
+      const totalGames = this.sortedResults.length;
+      
+      this.sortedResults.forEach((gameResult) => {
+        const value = countFunction(gameResult);
+        const key = labelFunction(value);
+        
+        if (!statsMap[key])
+          statsMap[key] = {
             count: 0,
-            [sortKey]: v,
+            [sortKey]: value,
           };
-        s[k].count++;
+        statsMap[key].count++;
       });
-      return Object.keys(s)
-        .map((k) => ({
-          label: k,
-          count: s[k].count,
-          percent: ((s[k].count / t) * 100).toFixed(1),
-          [sortKey]: s[k][sortKey],
+      
+      return Object.keys(statsMap)
+        .map((key) => ({
+          label: key,
+          count: statsMap[key].count,
+          percent: ((statsMap[key].count / totalGames) * 100).toFixed(1),
+          [sortKey]: statsMap[key][sortKey],
         }))
         .sort((a, b) => a[sortKey] - b[sortKey]);
     },
-    handleFileUpload(e) {
-      const f = e.target.files[0];
-      if (!f) return;
+    handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
       this.loading = true;
       this.results = [];
       this.highlightNum = null;
-      Papa.parse(f, {
+      
+      Papa.parse(file, {
         header: false,
         skipEmptyLines: true,
-        complete: (r) => {
-          this.results = r.data
+        complete: (parseResult) => {
+          this.results = parseResult.data
             .slice(1)
             .map((row) => {
               if (row.length < 3) return null;
@@ -333,13 +380,14 @@ createApp({
                 date: row[1],
                 numbers: row
                   .slice(2, 7)
-                  .filter((b) => b && b.trim())
-                  .map((b) => parseInt(b))
-                  .sort((a, b) => a - b)
-                  .map((b) => b.toString().padStart(2, '0')),
+                  .filter((cell) => cell && cell.trim())
+                  .map((cell) => parseInt(cell))
+                  .sort((numA, numB) => numA - numB)
+                  .map((num) => num.toString().padStart(2, '0')),
               };
             })
-            .filter((i) => i);
+            .filter((item) => item);
+            
           this.loading = false;
           this.currentPage = 1;
         },
@@ -348,19 +396,19 @@ createApp({
     toggleSort() {
       this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
     },
-    sortFrequency(c) {
-      if (this.freqSortColumn === c)
+    sortFrequency(column) {
+      if (this.freqSortColumn === column)
         this.freqSortOrder = this.freqSortOrder === 'asc' ? 'desc' : 'asc';
       else {
-        this.freqSortColumn = c;
+        this.freqSortColumn = column;
         this.freqSortOrder = 'desc';
       }
     },
     cleanFilters() {
       this.filterStartDate = '';
     },
-    toggleHighlight(n) {
-      this.highlightNum = this.highlightNum === n ? null : n;
+    toggleHighlight(number) {
+      this.highlightNum = this.highlightNum === number ? null : number;
     },
     nextPage() {
       if (this.currentPage < this.totalPages) {
@@ -378,8 +426,8 @@ createApp({
         });
       }
     },
-    getProgressBarColor(p) {
-      return p > 30 ? 'bg-success' : p > 15 ? 'bg-info' : 'bg-secondary';
+    getProgressBarColor(percent) {
+      return percent > 30 ? 'bg-success' : percent > 15 ? 'bg-info' : 'bg-secondary';
     },
     openGenerator() {
       if (!this.generatorModal)
@@ -393,14 +441,14 @@ createApp({
       this.generatedGame = null;
 
       setTimeout(() => {
-        let sortedNums;
+        let sortedNumbersList;
         if (this.frequencyTable && this.frequencyTable.length > 0) {
           const sortedTable = [...this.frequencyTable].sort(
             (a, b) => b.count - a.count,
           );
-          sortedNums = sortedTable.map((item) => parseInt(item.number));
+          sortedNumbersList = sortedTable.map((item) => parseInt(item.number));
         } else {
-          sortedNums = Array.from(
+          sortedNumbersList = Array.from(
             {
               length: 80,
             },
@@ -409,16 +457,16 @@ createApp({
         }
 
         const chunks = [];
-        const chunkSize = Math.ceil(sortedNums.length / 5);
+        const chunkSize = Math.ceil(sortedNumbersList.length / 5);
         for (let i = 0; i < 5; i++) {
-          chunks.push(sortedNums.slice(i * chunkSize, (i + 1) * chunkSize));
+          chunks.push(sortedNumbersList.slice(i * chunkSize, (i + 1) * chunkSize));
         }
 
         let bestGame = null;
         let attempts = 0;
         const maxAttempts = 5000;
 
-        const primeList = [
+        const primeNumbersList = [
           2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61,
           67, 71, 73, 79,
         ];
@@ -435,9 +483,9 @@ createApp({
           candidate = [...new Set(candidate)].sort((a, b) => a - b);
           if (candidate.length !== 5) continue;
 
-          const sum = candidate.reduce((a, b) => a + b, 0);
+          const sum = candidate.reduce((acc, curr) => acc + curr, 0);
           const evens = candidate.filter((n) => n % 2 === 0).length;
-          const primes = candidate.filter((n) => primeList.includes(n)).length;
+          const primes = candidate.filter((n) => primeNumbersList.includes(n)).length;
 
           if (sum < this.genConfig.minSum || sum > this.genConfig.maxSum)
             continue;
@@ -475,36 +523,37 @@ createApp({
       const currentGame = parseInt(row.game);
       let filterDateObj = null;
       if (this.filterStartDate) {
-        const p = this.filterStartDate.split('-');
-        filterDateObj = new Date(p[0], p[1] - 1, p[2]);
+        const dateParts = this.filterStartDate.split('-');
+        filterDateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
         filterDateObj.setHours(0, 0, 0, 0);
       }
-      const pastGames = this.results.filter((r) => {
-        const rGame = parseInt(r.game);
-        if (rGame >= currentGame) return false;
+      const pastGames = this.results.filter((gameResult) => {
+        const resultGameNumber = parseInt(gameResult.game);
+        if (resultGameNumber >= currentGame) return false;
         if (filterDateObj) {
-          const pr = r.date.split('/');
-          const rDate = new Date(pr[2], pr[1] - 1, pr[0]);
-          rDate.setHours(0, 0, 0, 0);
-          if (rDate < filterDateObj) return false;
+          const resultDateParts = gameResult.date.split('/');
+          const resultDate = new Date(resultDateParts[2], resultDateParts[1] - 1, resultDateParts[0]);
+          resultDate.setHours(0, 0, 0, 0);
+          if (resultDate < filterDateObj) return false;
         }
         return true;
       });
 
-      const counts = {};
-      pastGames.forEach((j) =>
-        j.numbers.forEach((b) => {
-          counts[b] = (counts[b] || 0) + 1;
+      const countsMap = {};
+      pastGames.forEach((gameResult) =>
+        gameResult.numbers.forEach((ballNumber) => {
+          countsMap[ballNumber] = (countsMap[ballNumber] || 0) + 1;
         }),
       );
-      let sortedNums =
+      
+      let sortedNumbersList =
         pastGames.length > 0
           ? Array.from(
               {
                 length: 80,
               },
               (_, i) => (i + 1).toString().padStart(2, '0'),
-            ).sort((a, b) => (counts[b] || 0) - (counts[a] || 0))
+            ).sort((a, b) => (countsMap[b] || 0) - (countsMap[a] || 0))
           : Array.from(
               {
                 length: 80,
@@ -514,21 +563,21 @@ createApp({
 
       const chunks = [];
       for (let i = 0; i < 5; i++)
-        chunks.push(sortedNums.slice(i * 16, (i + 1) * 16));
+        chunks.push(sortedNumbersList.slice(i * 16, (i + 1) * 16));
 
       const targetNums = row.numbers.map((n) => parseInt(n));
-      const sum = targetNums.reduce((a, b) => a + b, 0);
+      const sum = targetNums.reduce((acc, curr) => acc + curr, 0);
       const even = targetNums.filter((n) => n % 2 === 0).length;
-      const primesList = [
+      const primeNumbersList = [
         2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67,
         71, 73, 79,
       ];
-      const primes = targetNums.filter((n) => primesList.includes(n)).length;
+      const primes = targetNums.filter((n) => primeNumbersList.includes(n)).length;
 
       const quintilePattern = [0, 0, 0, 0, 0];
       targetNums.forEach((n) => {
-        const strN = n.toString().padStart(2, '0');
-        const chunkIndex = chunks.findIndex((chunk) => chunk.includes(strN));
+        const numberString = n.toString().padStart(2, '0');
+        const chunkIndex = chunks.findIndex((chunk) => chunk.includes(numberString));
         if (chunkIndex !== -1) quintilePattern[chunkIndex]++;
       });
 
@@ -570,7 +619,7 @@ createApp({
 
       const { chunks, quintilePattern, targetGame, mode } = this.simState;
       const targetStr = targetGame.numbers.join(',');
-      const primesList = [
+      const primeNumbersList = [
         2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67,
         71, 73, 79,
       ];
@@ -585,8 +634,8 @@ createApp({
 
         if (mode === 'random') {
           while (candidate.length < 5) {
-            const rnd = Math.floor(Math.random() * 80) + 1;
-            if (!candidate.includes(rnd)) candidate.push(rnd);
+            const randomNumber = Math.floor(Math.random() * 80) + 1;
+            if (!candidate.includes(randomNumber)) candidate.push(randomNumber);
           }
 
           candidate.sort((a, b) => a - b);
@@ -597,9 +646,9 @@ createApp({
               const chunk = chunks[i];
               const picked = [];
               while (picked.length < countNeeded) {
-                const rnd = chunk[Math.floor(Math.random() * chunk.length)];
+                const randomNumber = chunk[Math.floor(Math.random() * chunk.length)];
 
-                if (!picked.includes(rnd)) picked.push(rnd);
+                if (!picked.includes(randomNumber)) picked.push(randomNumber);
               }
               candidate.push(...picked);
             }
@@ -621,14 +670,14 @@ createApp({
         this.simState.attempts++;
 
         if (mode === 'smart') {
-          const sum = candidate.reduce((a, b) => a + parseInt(b), 0);
+          const sum = candidate.reduce((acc, curr) => acc + parseInt(curr), 0);
           if (sum !== targetGame.sum) continue;
 
           const evens = candidate.filter((n) => parseInt(n) % 2 === 0).length;
           if (evens !== targetGame.even) continue;
 
           const primes = candidate.filter((n) =>
-            primesList.includes(parseInt(n)),
+            primeNumbersList.includes(parseInt(n)),
           ).length;
           if (primes !== targetGame.primes) continue;
         }
@@ -653,11 +702,11 @@ createApp({
       }
 
       const diff = Math.floor((Date.now() - this.simState.startTime) / 1000);
-      const m = Math.floor(diff / 60)
+      const minutes = Math.floor(diff / 60)
         .toString()
         .padStart(2, '0');
-      const s = (diff % 60).toString().padStart(2, '0');
-      this.simState.elapsedTime = `${m}:${s}`;
+      const seconds = (diff % 60).toString().padStart(2, '0');
+      this.simState.elapsedTime = `${minutes}:${seconds}`;
 
       if (this.simState.running) {
         requestAnimationFrame(this.runSimLoop);
