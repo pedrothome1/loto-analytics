@@ -15,7 +15,7 @@
         <div class="d-flex justify-content-between align-items-center mb-2">
           <div>
             <h1 class="h4 mb-0"><i class="bi bi-graph-up"></i> Loto Analytics</h1>
-            <small class="text-light opacity-75">Loteria Inteligente</small>
+            <small class="text-light opacity-75">{{ lotteryConfig.name }} Inteligente</small>
           </div>
         </div>
 
@@ -57,17 +57,17 @@
                   <div class="col-6">
                     <label class="form-label mb-0 fw-bold">Qtd. Pares</label>
                     <div class="input-group input-group-sm">
-                      <input type="number" class="form-control" v-model="genConfig.evenMin" placeholder="Min">
+                      <input type="number" class="form-control" v-model="genConfig.evenMin" placeholder="Min" min="0" :max="lotteryConfig.pickSize">
                       <span class="input-group-text">-</span>
-                      <input type="number" class="form-control" v-model="genConfig.evenMax" placeholder="Max">
+                      <input type="number" class="form-control" v-model="genConfig.evenMax" placeholder="Max" min="0" :max="lotteryConfig.pickSize">
                     </div>
                   </div>
                   <div class="col-6">
                     <label class="form-label mb-0 fw-bold">Qtd. Primos</label>
                     <div class="input-group input-group-sm">
-                      <input type="number" class="form-control" v-model="genConfig.primeMin" placeholder="Min">
+                      <input type="number" class="form-control" v-model="genConfig.primeMin" placeholder="Min" min="0" :max="lotteryConfig.pickSize">
                       <span class="input-group-text">-</span>
-                      <input type="number" class="form-control" v-model="genConfig.primeMax" placeholder="Max">
+                      <input type="number" class="form-control" v-model="genConfig.primeMax" placeholder="Max" min="0" :max="lotteryConfig.pickSize">
                     </div>
                   </div>
                 </div>
@@ -84,17 +84,16 @@
                 </span>
               </div>
 
-
               <ul class="list-group list-group-flush text-start small border rounded">
                 <li class="list-group-item d-flex justify-content-between">
                   <span>Soma:</span>
-                  <span :class="(generatedGame.sum >= 140 && generatedGame.sum <= 260) ? 'text-success fw-bold' : ''">
-                    {{ generatedGame.sum }} <span class="text-muted" style="font-size:0.75rem"></span>
+                  <span :class="(generatedGame.sum >= lotteryConfig.limits.minSum && generatedGame.sum <= lotteryConfig.limits.maxSum) ? 'text-success fw-bold' : ''">
+                    {{ generatedGame.sum }}
                   </span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between">
                   <span>Pares / Ímpares:</span>
-                  <span class="fw-bold">{{ generatedGame.even }} / {{ 5 - generatedGame.even }}</span>
+                  <span class="fw-bold">{{ generatedGame.even }} / {{ lotteryConfig.pickSize - generatedGame.even }}</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between">
                   <span>Primos:</span>
@@ -103,9 +102,7 @@
               </ul>
             </div>
             <div v-else class="text-center py-4 text-muted">
-              <p>
-                Clique em Gerar para criar uma combinação.
-              </p>
+              <p>Clique em Gerar para criar uma combinação.</p>
             </div>
 
           </div>
@@ -144,7 +141,8 @@
                 <span>Soma:</span> <span class="fw-bold">{{ selectedDetails.sum }}</span>
               </li>
               <li class="list-group-item d-flex justify-content-between">
-                <span>Pares / Ímpares:</span> <span class="fw-bold">{{ selectedDetails.even }} / {{ 5 - selectedDetails.even }}</span>
+                <span>Pares / Ímpares:</span> 
+                <span class="fw-bold">{{ selectedDetails.even }} / {{ lotteryConfig.pickSize - selectedDetails.even }}</span>
               </li>
               <li class="list-group-item d-flex justify-content-between">
                 <span>Primos:</span> <span class="fw-bold">{{ selectedDetails.primes }}</span>
@@ -189,8 +187,8 @@
                   <div class="form-check mb-2">
                     <input class="form-check-input" type="radio" name="simMode" id="modeManual" value="manual" v-model="simState.mode">
                     <label class="form-check-label small" for="modeManual">
-                      <strong>Estratégia Manual (Quintis)</strong><br>
-                      <span class="text-muted">Pega 1 número de cada grupo de frequência, respeitando seus filtros abaixo.</span>
+                      <strong>Estratégia Manual (Grupos de Frequência)</strong><br>
+                      <span class="text-muted">Divide os números em {{ lotteryConfig.pickSize }} grupos e tenta equilibrar a escolha.</span>
                     </label>
                   </div>
               
@@ -207,17 +205,17 @@
                       <div class="col-6">
                         <label class="form-label small fw-bold mb-0">Pares</label>
                         <div class="input-group input-group-sm">
-                          <input type="number" class="form-control" v-model="simState.customConfig.evenMin" placeholder="Min">
+                          <input type="number" class="form-control" v-model="simState.customConfig.evenMin" placeholder="Min" min="0" :max="lotteryConfig.pickSize">
                           <span class="input-group-text">-</span>
-                          <input type="number" class="form-control" v-model="simState.customConfig.evenMax" placeholder="Max">
+                          <input type="number" class="form-control" v-model="simState.customConfig.evenMax" placeholder="Max" min="0" :max="lotteryConfig.pickSize">
                         </div>
                       </div>
                       <div class="col-6">
                         <label class="form-label small fw-bold mb-0">Primos</label>
                         <div class="input-group input-group-sm">
-                          <input type="number" class="form-control" v-model="simState.customConfig.primeMin" placeholder="Min">
+                          <input type="number" class="form-control" v-model="simState.customConfig.primeMin" placeholder="Min" min="0" :max="lotteryConfig.pickSize">
                           <span class="input-group-text">-</span>
-                          <input type="number" class="form-control" v-model="simState.customConfig.primeMax" placeholder="Max">
+                          <input type="number" class="form-control" v-model="simState.customConfig.primeMax" placeholder="Max" min="0" :max="lotteryConfig.pickSize">
                         </div>
                       </div>
                     </div>
@@ -234,7 +232,6 @@
                   </div>
                 </div>
               </div>
-
 
               <button class="btn btn-primary w-100 fw-bold" @click="startSim">
                 <i class="bi bi-play-fill"></i> INICIAR SIMULAÇÃO
@@ -335,17 +332,17 @@
                 <div class="col-6">
                   <label class="form-label small mb-0 fw-bold">Pares (Min-Max)</label>
                   <div class="input-group input-group-sm">
-                    <input type="number" class="form-control" placeholder="0" v-model="filters.evenMin">
+                    <input type="number" class="form-control" placeholder="Min" v-model="filters.evenMin" min="0" :max="lotteryConfig.pickSize">
                     <span class="input-group-text">-</span>
-                    <input type="number" class="form-control" placeholder="5" v-model="filters.evenMax">
+                    <input type="number" class="form-control" placeholder="Max" v-model="filters.evenMax" min="0" :max="lotteryConfig.pickSize">
                   </div>
                 </div>
                 <div class="col-6">
                   <label class="form-label small mb-0 fw-bold">Primos (Min-Max)</label>
                   <div class="input-group input-group-sm">
-                    <input type="number" class="form-control" placeholder="0" v-model="filters.primeMin">
+                    <input type="number" class="form-control" placeholder="Min" v-model="filters.primeMin" min="0" :max="lotteryConfig.pickSize">
                     <span class="input-group-text">-</span>
-                    <input type="number" class="form-control" placeholder="5" v-model="filters.primeMax">
+                    <input type="number" class="form-control" placeholder="Max" v-model="filters.primeMax" min="0" :max="lotteryConfig.pickSize">
                   </div>
                 </div>
               </div>

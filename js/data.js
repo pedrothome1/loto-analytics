@@ -4,22 +4,13 @@ export function getAppData() {
   return {
     loading: false,
     results: [],
-    
     sortOrder: 'desc',
     
     filters: {
-      startDate: '',
-      endDate: '',
-      day: '',       
-      month: '',     
-      year: '',      
-      leapYear: false, 
-      evenMin: '',
-      evenMax: '',
-      primeMin: '',
-      primeMax: '',
-      sumMin: '',    
-      sumMax: ''
+      startDate: '', endDate: '', day: '', month: '', year: '', leapYear: false, 
+      evenMin: '', evenMax: '', 
+      primeMin: '', primeMax: '', 
+      sumMin: '', sumMax: ''
     },
 
     freqSortColumn: 'count',
@@ -30,7 +21,14 @@ export function getAppData() {
     
     generatedGame: null,
     generatorModal: null,
-    genConfig: { ...LotteryConfig.defaultGenConfig }, 
+    
+    // CORREÇÃO: Usa 'limits' da config, não values hardcoded
+    genConfig: { 
+      minSum: LotteryConfig.limits.minSum,
+      maxSum: LotteryConfig.limits.maxSum,
+      evenMin: LotteryConfig.limits.evenMin, evenMax: LotteryConfig.limits.evenMax,
+      primeMin: LotteryConfig.limits.primeMin, primeMax: LotteryConfig.limits.primeMax
+    }, 
     
     detailsModal: null,
     selectedDetails: null,
@@ -39,6 +37,7 @@ export function getAppData() {
     simModal: null,
     simState: {
       running: false,
+      mode: 'smart',
       attempts: 0,
       startTime: null,
       elapsedTime: '00:00',
@@ -46,14 +45,19 @@ export function getAppData() {
       bestTry: null,
       quintilePattern: [],
       chunks: [],
+      // CORREÇÃO: Inicializa com base na config da loteria atual
       customConfig: {
-        minSum: 140, maxSum: 260,
-        evenMin: '', evenMax: '',
-        primeMin: '', primeMax: ''
+        minSum: LotteryConfig.limits.minSum, 
+        maxSum: LotteryConfig.limits.maxSum,
+        evenMin: LotteryConfig.limits.evenMin, evenMax: LotteryConfig.limits.evenMax,
+        primeMin: LotteryConfig.limits.primeMin, primeMax: LotteryConfig.limits.primeMax
       },
     },
     
     visitedBitmap: null,
     combTable: null,
+    
+    // Helper para expor config no template (HTML)
+    lotteryConfig: LotteryConfig 
   };
 }

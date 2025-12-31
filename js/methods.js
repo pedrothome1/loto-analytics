@@ -255,7 +255,10 @@ export const appMethods = {
             return chunk[Math.floor(Math.random() * chunk.length)];
           });
         } else {
-          const poolSize = Math.min(50, sortedNumbersList.length);
+          // DINÂMICO: Pool size agora é proporcional ao tamanho do jogo ou 65% do total
+          const dynamicPool = Math.floor(LotteryConfig.totalNumbers * 0.65);
+          const poolSize = Math.min(dynamicPool, sortedNumbersList.length);
+          
           const activePool = sortedNumbersList.slice(0, poolSize);
           
           while (candidate.length < LotteryConfig.pickSize) {
@@ -264,6 +267,7 @@ export const appMethods = {
           }
         }
 
+        // --- PARTE QUE ESTAVA FALTANDO/CORTADA ---
         candidate = [...new Set(candidate)].sort((a, b) => a - b);
         if (candidate.length !== LotteryConfig.pickSize) continue;
 
@@ -318,7 +322,8 @@ export const appMethods = {
       quintilePattern,
       chunks,
       customConfig: {
-        minSum: 100, maxSum: 300,
+        minSum: LotteryConfig.limits.minSum, 
+        maxSum: LotteryConfig.limits.maxSum,
         evenMin: '', evenMax: '',
         primeMin: '', primeMax: ''
       },
@@ -361,7 +366,6 @@ export const appMethods = {
     this.runSimLoop();
   },
 
-
   runSimLoop() {
     if (!this.simState.running) return;
 
@@ -369,26 +373,24 @@ export const appMethods = {
     const targetStr = targetGame.numbers.join(',');
     
     // --- OTIMIZAÇÃO POR TEMPO (TIME-BASED) ---
-    // Em vez de uma quantidade fixa (batchSize), rodamos o loop por aprox. 12ms.
-    // Isso deixa ~4ms para o navegador desenhar a tela (mantendo 60 FPS).
-    // Resolve o problema de travamento e do contador "pulando".
+    // Roda o loop por aprox. 12ms para manter a interface fluida (60 FPS)
     const frameStart = performance.now();
     const frameLimit = 12; // milissegundos
 
     let safetyCounter = 0;
-    const safetyLimit = 5000; // Limite menor para abortar tentativas falhas rápido
+    const safetyLimit = 5000; // Aborta tentativas falhas rapidamente para não gastar processamento
 
     // Loop roda enquanto não estourar o tempo do frame
     while (performance.now() - frameStart < frameLimit) {
       
-      // Verificação de segurança para loops infinitos lógicos
+      // Disjuntor de segurança
       if (safetyCounter > safetyLimit) {
-        break; // Sai do loop para dar chance ao navegador de respirar
+        break; // Sai do loop neste frame e continua no próximo
       }
 
       let candidate = [];
 
-      // 1. GERAÇÃO (Lógica igual a anterior)
+      // 1. GERAÇÃO (Genérica para qualquer loteria)
       if (mode === 'random') {
         while (candidate.length < LotteryConfig.pickSize) {
           const rnd = Math.floor(Math.random() * LotteryConfig.totalNumbers) + 1;
@@ -397,14 +399,18 @@ export const appMethods = {
         candidate.sort((a, b) => a - b);
       } 
       else if (mode === 'smart') {
+         // Modo Smart: Segue rigorosamente o padrão do jogo alvo
          for (let i = 0; i < LotteryConfig.pickSize; i++) {
             const needed = quintilePattern[i];
             if (needed > 0) {
               const chunk = chunks[i];
               const picked = [];
-              while(picked.length < needed) {
+              // Previne loop infinito se o chunk for menor que o necessário (raro, mas seguro)
+              let safety = 0;
+              while(picked.length < needed && safety < 100) {
                 const rnd = chunk[Math.floor(Math.random() * chunk.length)];
                 if (!picked.includes(rnd)) picked.push(rnd);
+                safety++;
               }
               candidate.push(...picked);
             }
@@ -412,24 +418,39 @@ export const appMethods = {
           candidate.sort((a, b) => a - b);
       }
       else if (mode === 'manual') {
-        // Lógica "Best Effort"
-        let groupIndices = [0, 1, 2, 3, 4];
+        // --- LÓGICA "BEST EFFORT" GENÉRICA ---
+        
+        // A. Cria índices baseados no tamanho do jogo (ex: [0,1,2,3,4] para Quina, [0..5] para Mega)
+        let groupIndices = Array.from({ length: LotteryConfig.pickSize }, (_, i) => i);
+
+        // B. Embaralha a ordem de escolha (Fisher-Yates simplificado)
         for (let i = groupIndices.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [groupIndices[i], groupIndices[j]] = [groupIndices[j], groupIndices[i]];
         }
+
+        // C. Mutação (30% de chance): Troca um grupo por outro aleatório
+        // Isso destrava as combinações impossíveis de atingir apenas com "1 de cada"
         if (Math.random() < 0.30) {
            const idxToChange = Math.floor(Math.random() * LotteryConfig.pickSize);
+           // Sorteia qualquer grupo disponível nos chunks
            groupIndices[idxToChange] = Math.floor(Math.random() * chunks.length);
         }
 
+        // D. Preenche os números
         while (candidate.length < LotteryConfig.pickSize) {
-           const chunkIdx = groupIndices.length > 0 ? groupIndices.shift() : Math.floor(Math.random() * chunks.length);
+           // Pega o índice do grupo da lista ou um aleatório se a lista acabar
+           const chunkIdx = groupIndices.length > 0 
+                            ? groupIndices.shift() 
+                            : Math.floor(Math.random() * chunks.length);
+           
            const chunk = chunks[chunkIdx];
+
            if (chunk && chunk.length > 0) {
              const rnd = chunk[Math.floor(Math.random() * chunk.length)];
              if (!candidate.includes(rnd)) candidate.push(rnd);
            } else {
+             // Fallback genérico
              const r = Math.floor(Math.random() * LotteryConfig.totalNumbers) + 1;
              if (!candidate.includes(r)) candidate.push(r);
            }
@@ -437,7 +458,7 @@ export const appMethods = {
         candidate.sort((a, b) => a - b);
       }
 
-      // 2. BITSET CHECK
+      // 2. BITSET CHECK (Evita jogos repetidos)
       const idx = this.getGameIndex(candidate);
       const byteIdx = Math.floor(idx / 8);
       const bitIdx = idx % 8;
@@ -462,9 +483,12 @@ export const appMethods = {
       else if (mode === 'manual') {
         const stats = analyzeGame(candidate, PRIMES);
         
+        // Validação genérica baseada na config do usuário
         if (stats.sum < customConfig.minSum || stats.sum > customConfig.maxSum) isValid = false;
+        
         if (isValid && customConfig.evenMin !== '' && stats.even < parseInt(customConfig.evenMin)) isValid = false;
         if (isValid && customConfig.evenMax !== '' && stats.even > parseInt(customConfig.evenMax)) isValid = false;
+
         if (isValid && customConfig.primeMin !== '' && stats.primes < parseInt(customConfig.primeMin)) isValid = false;
         if (isValid && customConfig.primeMax !== '' && stats.primes > parseInt(customConfig.primeMax)) isValid = false;
       }
@@ -480,8 +504,7 @@ export const appMethods = {
       // 4. VERIFICA ACERTO
       const formatted = candidate.map(n => n.toString().padStart(2, '0'));
       
-      // Atualiza o "Best Try" visualmente apenas a cada ~100ms para não pesar o DOM
-      // (Usamos o próprio attempts como relógio simples)
+      // Atualiza o "Best Try" visualmente a cada 20 tentativas válidas
       if (this.simState.attempts % 20 === 0) this.simState.bestTry = formatted;
 
       if (formatted.join(',') === targetStr) {
@@ -502,8 +525,6 @@ export const appMethods = {
     // Agenda o próximo frame se ainda estiver rodando
     if (this.simState.running) requestAnimationFrame(this.runSimLoop.bind(this));
   },
-
-
 
   stopSim() { this.simState.running = false; },
   resetSim() {
