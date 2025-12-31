@@ -1,14 +1,19 @@
-import { getAppData } from './data.js';
-import { appComputed } from './computed.js';
-import { appMethods } from './methods.js';
+import { CoreModule } from './core.js';
+import { FiltersModule } from './filters.js';
+import { UiModule } from './ui.js';
+import { StatsModule } from './stats.js';
+import { GeneratorModule } from './generator.js';
+import { SimulationModule } from './simulation.js';
 
 const { createApp } = Vue;
 
 createApp({
-  data: getAppData, // Sintaxe curta
-  watch: {
-    sortedResults() { this.currentPage = 1; }
-  },
-  computed: appComputed,
-  methods: appMethods,
+  mixins: [
+    CoreModule,
+    FiltersModule,
+    UiModule,
+    StatsModule,
+    GeneratorModule,
+    SimulationModule
+  ]
 }).mount('#app');
