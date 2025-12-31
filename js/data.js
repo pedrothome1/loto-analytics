@@ -46,6 +46,11 @@ export function getAppData() {
       bestTry: null,
       quintilePattern: [],
       chunks: [],
+      customConfig: {
+        minSum: 140, maxSum: 260,
+        evenMin: '', evenMax: '',
+        primeMin: '', primeMax: ''
+      },
     },
     
     visitedBitmap: null,

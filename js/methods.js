@@ -316,7 +316,12 @@ export const appMethods = {
       targetGame: { ...row, ...stats },
       bestTry: Array(LotteryConfig.pickSize).fill('..'),
       quintilePattern,
-      chunks
+      chunks,
+      customConfig: {
+        minSum: 100, maxSum: 300,
+        evenMin: '', evenMax: '',
+        primeMin: '', primeMax: ''
+      },
     };
 
     if (!this.simModal) this.simModal = new bootstrap.Modal(document.getElementById('simModal'));
@@ -324,6 +329,31 @@ export const appMethods = {
   },
 
   startSim() {
+    // VALIDAÇÃO DE COMPATIBILIDADE (Apenas modo Manual)
+    if (this.simState.mode === 'manual') {
+      const tgt = this.simState.targetGame;
+      const cfg = this.simState.customConfig;
+      const errors = [];
+
+      // Verifica Soma
+      if (tgt.sum < cfg.minSum || tgt.sum > cfg.maxSum) {
+        errors.push(`Soma do alvo (${tgt.sum}) está fora do intervalo (${cfg.minSum}-${cfg.maxSum}).`);
+      }
+
+      // Verifica Pares
+      if (cfg.evenMin !== '' && tgt.even < parseInt(cfg.evenMin)) errors.push(`Alvo tem ${tgt.even} pares (Mínimo exigido: ${cfg.evenMin}).`);
+      if (cfg.evenMax !== '' && tgt.even > parseInt(cfg.evenMax)) errors.push(`Alvo tem ${tgt.even} pares (Máximo permitido: ${cfg.evenMax}).`);
+
+      // Verifica Primos
+      if (cfg.primeMin !== '' && tgt.primes < parseInt(cfg.primeMin)) errors.push(`Alvo tem ${tgt.primes} primos (Mínimo exigido: ${cfg.primeMin}).`);
+      if (cfg.primeMax !== '' && tgt.primes > parseInt(cfg.primeMax)) errors.push(`Alvo tem ${tgt.primes} primos (Máximo permitido: ${cfg.primeMax}).`);
+
+      if (errors.length > 0) {
+        alert("CONFIGURAÇÃO IMPOSSÍVEL!\n\nVocê definiu parâmetros que excluem o jogo alvo. O robô nunca acertaria.\n\n" + errors.join("\n"));
+        return; // Impede o início
+      }
+    }
+
     this.simState.running = true;
     this.simState.startTime = Date.now();
     this.simState.attempts = 0;
@@ -331,77 +361,149 @@ export const appMethods = {
     this.runSimLoop();
   },
 
+
   runSimLoop() {
     if (!this.simState.running) return;
 
-    const { chunks, quintilePattern, targetGame, mode } = this.simState;
+    const { chunks, quintilePattern, targetGame, mode, customConfig } = this.simState;
     const targetStr = targetGame.numbers.join(',');
-    const batchSize = mode === 'random' ? LotteryConfig.simBatchSize.random : LotteryConfig.simBatchSize.smart;
     
-    let batch = 0;
+    // --- OTIMIZAÇÃO POR TEMPO (TIME-BASED) ---
+    // Em vez de uma quantidade fixa (batchSize), rodamos o loop por aprox. 12ms.
+    // Isso deixa ~4ms para o navegador desenhar a tela (mantendo 60 FPS).
+    // Resolve o problema de travamento e do contador "pulando".
+    const frameStart = performance.now();
+    const frameLimit = 12; // milissegundos
 
-    while (batch < batchSize) {
-      batch++;
+    let safetyCounter = 0;
+    const safetyLimit = 5000; // Limite menor para abortar tentativas falhas rápido
+
+    // Loop roda enquanto não estourar o tempo do frame
+    while (performance.now() - frameStart < frameLimit) {
+      
+      // Verificação de segurança para loops infinitos lógicos
+      if (safetyCounter > safetyLimit) {
+        break; // Sai do loop para dar chance ao navegador de respirar
+      }
+
       let candidate = [];
 
+      // 1. GERAÇÃO (Lógica igual a anterior)
       if (mode === 'random') {
         while (candidate.length < LotteryConfig.pickSize) {
           const rnd = Math.floor(Math.random() * LotteryConfig.totalNumbers) + 1;
           if (!candidate.includes(rnd)) candidate.push(rnd);
         }
         candidate.sort((a, b) => a - b);
-      } else {
-        for (let i = 0; i < LotteryConfig.pickSize; i++) {
-          const needed = quintilePattern[i];
-          if (needed > 0) {
-            const chunk = chunks[i];
-            const picked = [];
-            while(picked.length < needed) {
-              const rnd = chunk[Math.floor(Math.random() * chunk.length)];
-              if (!picked.includes(rnd)) picked.push(rnd);
+      } 
+      else if (mode === 'smart') {
+         for (let i = 0; i < LotteryConfig.pickSize; i++) {
+            const needed = quintilePattern[i];
+            if (needed > 0) {
+              const chunk = chunks[i];
+              const picked = [];
+              while(picked.length < needed) {
+                const rnd = chunk[Math.floor(Math.random() * chunk.length)];
+                if (!picked.includes(rnd)) picked.push(rnd);
+              }
+              candidate.push(...picked);
             }
-            candidate.push(...picked);
           }
+          candidate.sort((a, b) => a - b);
+      }
+      else if (mode === 'manual') {
+        // Lógica "Best Effort"
+        let groupIndices = [0, 1, 2, 3, 4];
+        for (let i = groupIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [groupIndices[i], groupIndices[j]] = [groupIndices[j], groupIndices[i]];
+        }
+        if (Math.random() < 0.30) {
+           const idxToChange = Math.floor(Math.random() * LotteryConfig.pickSize);
+           groupIndices[idxToChange] = Math.floor(Math.random() * chunks.length);
+        }
+
+        while (candidate.length < LotteryConfig.pickSize) {
+           const chunkIdx = groupIndices.length > 0 ? groupIndices.shift() : Math.floor(Math.random() * chunks.length);
+           const chunk = chunks[chunkIdx];
+           if (chunk && chunk.length > 0) {
+             const rnd = chunk[Math.floor(Math.random() * chunk.length)];
+             if (!candidate.includes(rnd)) candidate.push(rnd);
+           } else {
+             const r = Math.floor(Math.random() * LotteryConfig.totalNumbers) + 1;
+             if (!candidate.includes(r)) candidate.push(r);
+           }
         }
         candidate.sort((a, b) => a - b);
       }
 
+      // 2. BITSET CHECK
       const idx = this.getGameIndex(candidate);
       const byteIdx = Math.floor(idx / 8);
       const bitIdx = idx % 8;
 
-      if ((this.visitedBitmap[byteIdx] & (1 << bitIdx)) !== 0) continue;
-      this.visitedBitmap[byteIdx] |= (1 << bitIdx);
+      if ((this.visitedBitmap[byteIdx] & (1 << bitIdx)) !== 0) {
+        safetyCounter++;
+        continue;
+      }
       
-      this.simState.attempts++;
+      this.visitedBitmap[byteIdx] |= (1 << bitIdx);
+      this.simState.attempts++; // Incrementa contador visual
+
+      // 3. VALIDAÇÃO
+      let isValid = true;
 
       if (mode === 'smart') {
         const sum = candidate.reduce((a, b) => a + b, 0);
-        if (sum !== targetGame.sum) continue;
+        if (sum !== targetGame.sum) isValid = false;
+        if (isValid && candidate.filter(n => n % 2 === 0).length !== targetGame.even) isValid = false;
+        if (isValid && candidate.filter(n => PRIMES.includes(n)).length !== targetGame.primes) isValid = false;
+      } 
+      else if (mode === 'manual') {
+        const stats = analyzeGame(candidate, PRIMES);
         
-        const even = candidate.filter(n => n % 2 === 0).length;
-        if (even !== targetGame.even) continue;
-
-        const primes = candidate.filter(n => PRIMES.includes(n)).length;
-        if (primes !== targetGame.primes) continue;
+        if (stats.sum < customConfig.minSum || stats.sum > customConfig.maxSum) isValid = false;
+        if (isValid && customConfig.evenMin !== '' && stats.even < parseInt(customConfig.evenMin)) isValid = false;
+        if (isValid && customConfig.evenMax !== '' && stats.even > parseInt(customConfig.evenMax)) isValid = false;
+        if (isValid && customConfig.primeMin !== '' && stats.primes < parseInt(customConfig.primeMin)) isValid = false;
+        if (isValid && customConfig.primeMax !== '' && stats.primes > parseInt(customConfig.primeMax)) isValid = false;
       }
 
+      if (!isValid) {
+        safetyCounter++;
+        continue; 
+      }
+
+      // SUCESSO DO LOOP (Jogo válido e não repetido)
+      safetyCounter = 0;
+
+      // 4. VERIFICA ACERTO
       const formatted = candidate.map(n => n.toString().padStart(2, '0'));
-      if (batch % 500 === 0) this.simState.bestTry = formatted;
+      
+      // Atualiza o "Best Try" visualmente apenas a cada ~100ms para não pesar o DOM
+      // (Usamos o próprio attempts como relógio simples)
+      if (this.simState.attempts % 20 === 0) this.simState.bestTry = formatted;
 
       if (formatted.join(',') === targetStr) {
         this.simState.bestTry = formatted;
         this.simState.running = false;
+        const modeText = mode === 'smart' ? 'Privilegiado' : mode === 'manual' ? 'Manual/Estratégia' : 'Aleatório';
+        
         setTimeout(() => {
-          alert(`ACERTOU (${mode === 'smart' ? 'Inteligente' : 'Aleatório'})!\nJogos: ${this.simState.attempts.toLocaleString()}\nTempo: ${this.simState.elapsedTime}`);
+          alert(`ACERTOU (${modeText})!\nJogos: ${this.simState.attempts.toLocaleString()}\nTempo: ${this.simState.elapsedTime}`);
         }, 10);
         return;
       }
     }
 
+    // Atualiza tempo decorrido na tela
     this.simState.elapsedTime = formatTime(Date.now() - this.simState.startTime);
-    if (this.simState.running) requestAnimationFrame(this.runSimLoop);
+    
+    // Agenda o próximo frame se ainda estiver rodando
+    if (this.simState.running) requestAnimationFrame(this.runSimLoop.bind(this));
   },
+
+
 
   stopSim() { this.simState.running = false; },
   resetSim() {

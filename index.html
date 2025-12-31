@@ -177,24 +177,64 @@
               <div class="card bg-light border-0 mb-3 text-start">
                 <div class="card-body">
                   <label class="form-label fw-bold small">Escolha o Método:</label>
-
+              
                   <div class="form-check mb-2">
                     <input class="form-check-input" type="radio" name="simMode" id="modeSmart" value="smart" v-model="simState.mode">
                     <label class="form-check-label small" for="modeSmart">
-                      <strong>Usar "Informação Privilegiada"</strong><br>
-                      <span class="text-muted">O robô sabe a soma, pares/ímpares, primos e padrão de frequência exatos deste sorteio.</span>
+                      <strong>Informação Privilegiada (Automático)</strong><br>
+                      <span class="text-muted">Copia exatamente a soma, pares e primos deste sorteio.</span>
                     </label>
                   </div>
-
+              
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="simMode" id="modeManual" value="manual" v-model="simState.mode">
+                    <label class="form-check-label small" for="modeManual">
+                      <strong>Estratégia Manual (Quintis)</strong><br>
+                      <span class="text-muted">Pega 1 número de cada grupo de frequência, respeitando seus filtros abaixo.</span>
+                    </label>
+                  </div>
+              
                   <div class="form-check">
                     <input class="form-check-input" type="radio" name="simMode" id="modeRandom" value="random" v-model="simState.mode">
                     <label class="form-check-label small" for="modeRandom">
-                      <strong>Aleatório Puro (Cego)</strong><br>
-                      <span class="text-muted">O robô não sabe nada. Apenas chuta 5 números aleatórios.</span>
+                      <strong>Aleatório Puro (Cego)</strong>
                     </label>
+                  </div>
+              
+                  <div v-if="simState.mode === 'manual'" class="mt-3 pt-3 border-top">
+                    
+                    <div class="row g-2 mb-2">
+                      <div class="col-6">
+                        <label class="form-label small fw-bold mb-0">Pares</label>
+                        <div class="input-group input-group-sm">
+                          <input type="number" class="form-control" v-model="simState.customConfig.evenMin" placeholder="Min">
+                          <span class="input-group-text">-</span>
+                          <input type="number" class="form-control" v-model="simState.customConfig.evenMax" placeholder="Max">
+                        </div>
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label small fw-bold mb-0">Primos</label>
+                        <div class="input-group input-group-sm">
+                          <input type="number" class="form-control" v-model="simState.customConfig.primeMin" placeholder="Min">
+                          <span class="input-group-text">-</span>
+                          <input type="number" class="form-control" v-model="simState.customConfig.primeMax" placeholder="Max">
+                        </div>
+                      </div>
+                    </div>
+              
+                    <div class="mb-0">
+                      <label class="form-label small fw-bold mb-0">Soma</label>
+                      <div class="input-group input-group-sm">
+                        <input type="number" class="form-control" v-model.number="simState.customConfig.minSum" placeholder="Min">
+                        <span class="input-group-text">-</span>
+                        <input type="number" class="form-control" v-model.number="simState.customConfig.maxSum" placeholder="Max">
+                      </div>
+                    </div>
+              
                   </div>
                 </div>
               </div>
+
 
               <button class="btn btn-primary w-100 fw-bold" @click="startSim">
                 <i class="bi bi-play-fill"></i> INICIAR SIMULAÇÃO
