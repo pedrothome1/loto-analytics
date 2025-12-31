@@ -7,8 +7,10 @@ export const LotteryConfig = {
   defaultGenConfig: {
     minSum: 140,
     maxSum: 260,
-    evenCount: 'any',
-    primeCount: 'any',
+    evenMin: '', 
+    evenMax: '', 
+    primeMin: '', 
+    primeMax: '', 
   },
 
   // Para paginação e performance

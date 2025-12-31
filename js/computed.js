@@ -16,14 +16,19 @@ export const appComputed = {
   activeFiltersCount() {
     let c = 0;
     const f = this.filters;
+    
+    // Filtros de Data
     if (f.startDate) c++;
     if (f.day) c++;
     if (f.month) c++;
     if (f.year) c++;
     if (f.leapYear) c++;
-    if (f.evenCount !== '') c++;
-    if (f.primeCount !== '') c++;
+
+    // Filtros de Estatística (Considera ativo se min OU max estiver preenchido)
+    if (f.evenMin !== '' || f.evenMax !== '') c++;
+    if (f.primeMin !== '' || f.primeMax !== '') c++;
     if (f.sumMin !== '' || f.sumMax !== '') c++;
+    
     return c;
   },
 

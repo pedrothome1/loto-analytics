@@ -80,6 +80,7 @@ export const appMethods = {
     const f = this.filters;
     const s = row.stats;
 
+    // Filtros de Data
     if (f.startDate) {
       const [y, m, d] = f.startDate.split('-');
       if (s.time < new Date(y, m - 1, d).setHours(0,0,0,0)) return false;
@@ -90,8 +91,14 @@ export const appMethods = {
     if (f.year && s.y !== parseInt(f.year)) return false;
     if (f.leapYear && !s.isLeap) return false;
 
-    if (f.evenCount !== '' && s.even !== parseInt(f.evenCount)) return false;
-    if (f.primeCount !== '' && s.primes !== parseInt(f.primeCount)) return false;
+    // NOVOS Filtros de Intervalo (Pares e Primos)
+    if (f.evenMin !== '' && s.even < parseInt(f.evenMin)) return false;
+    if (f.evenMax !== '' && s.even > parseInt(f.evenMax)) return false;
+
+    if (f.primeMin !== '' && s.primes < parseInt(f.primeMin)) return false;
+    if (f.primeMax !== '' && s.primes > parseInt(f.primeMax)) return false;
+
+    // Filtro de Soma
     if (f.sumMin !== '' && s.sum < parseInt(f.sumMin)) return false;
     if (f.sumMax !== '' && s.sum > parseInt(f.sumMax)) return false;
 
@@ -101,7 +108,10 @@ export const appMethods = {
   cleanFilters() {
     this.filters = {
       startDate: '', endDate: '', day: '', month: '', year: '', 
-      leapYear: false, evenCount: '', primeCount: '', sumMin: '', sumMax: ''
+      leapYear: false, 
+      evenMin: '', evenMax: '', 
+      primeMin: '', primeMax: '', 
+      sumMin: '', sumMax: ''
     };
   },
 
@@ -195,19 +205,17 @@ export const appMethods = {
   isValidGame(nums, config) {
     const stats = analyzeGame(nums, PRIMES);
     
+    // Validação de Soma
     if (config.minSum && (stats.sum < config.minSum || stats.sum > config.maxSum)) return false;
     
-    if (config.evenCount !== 'any') {
-      if (stats.even !== parseInt(config.evenCount)) return false;
-    } else {
-      if (stats.even === 0 || stats.even === LotteryConfig.pickSize) return false;
-    }
+    // Validação de Intervalo de Pares
+    // Se o usuário deixou vazio (''), ignoramos o limite.
+    if (config.evenMin !== '' && stats.even < parseInt(config.evenMin)) return false;
+    if (config.evenMax !== '' && stats.even > parseInt(config.evenMax)) return false;
 
-    if (config.primeCount !== 'any') {
-      if (stats.primes !== parseInt(config.primeCount)) return false;
-    } else {
-      if (stats.primes > Math.ceil(LotteryConfig.pickSize / 1.5)) return false;
-    }
+    // Validação de Intervalo de Primos
+    if (config.primeMin !== '' && stats.primes < parseInt(config.primeMin)) return false;
+    if (config.primeMax !== '' && stats.primes > parseInt(config.primeMax)) return false;
 
     return { isValid: true, stats };
   },

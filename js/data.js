@@ -14,8 +14,10 @@ export function getAppData() {
       month: '',     
       year: '',      
       leapYear: false, 
-      evenCount: '', 
-      primeCount: '',
+      evenMin: '',
+      evenMax: '',
+      primeMin: '',
+      primeMax: '',
       sumMin: '',    
       sumMax: ''
     },

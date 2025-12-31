@@ -42,39 +42,33 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-
             <div class="card bg-light border-0 mb-3 small">
               <div class="card-body p-2">
-                <div class="row g-2 align-items-end">
+                <div class="mb-2">
+                  <label class="form-label mb-0 fw-bold">Soma Total</label>
+                  <div class="input-group input-group-sm">
+                    <input type="number" class="form-control" v-model.number="genConfig.minSum" placeholder="Min">
+                    <span class="input-group-text">-</span>
+                    <input type="number" class="form-control" v-model.number="genConfig.maxSum" placeholder="Max">
+                  </div>
+                </div>
+
+                <div class="row g-2">
                   <div class="col-6">
-                    <label class="form-label mb-1 fw-bold">Soma (Mín-Máx)</label>
+                    <label class="form-label mb-0 fw-bold">Qtd. Pares</label>
                     <div class="input-group input-group-sm">
-                      <input type="number" class="form-control" v-model.number="genConfig.minSum">
+                      <input type="number" class="form-control" v-model="genConfig.evenMin" placeholder="Min">
                       <span class="input-group-text">-</span>
-                      <input type="number" class="form-control" v-model.number="genConfig.maxSum">
+                      <input type="number" class="form-control" v-model="genConfig.evenMax" placeholder="Max">
                     </div>
                   </div>
-                  <div class="col-3">
-                    <label class="form-label mb-1 fw-bold">Pares</label>
-                    <select class="form-select form-select-sm" v-model="genConfig.evenCount">
-                      <option value="any">Auto</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                    </select>
-                  </div>
-                  <div class="col-3">
-                    <label class="form-label mb-1 fw-bold">Primos</label>
-                    <select class="form-select form-select-sm" v-model="genConfig.primeCount">
-                      <option value="any">Auto</option>
-                      <option value="0">0</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                      <option value="5">5</option>
-                    </select>
+                  <div class="col-6">
+                    <label class="form-label mb-0 fw-bold">Qtd. Primos</label>
+                    <div class="input-group input-group-sm">
+                      <input type="number" class="form-control" v-model="genConfig.primeMin" placeholder="Min">
+                      <span class="input-group-text">-</span>
+                      <input type="number" class="form-control" v-model="genConfig.primeMax" placeholder="Max">
+                    </div>
                   </div>
                 </div>
               </div>
@@ -297,30 +291,27 @@
               </div>
 
               <h6 class="border-bottom pb-1 mb-2">Características do Jogo</h6>
-              <div class="row g-2 mb-3">
+              <div class="row g-2 mb-2">
                 <div class="col-6">
-                  <label class="form-label small mb-0">Qtd Pares</label>
-                  <select class="form-select form-select-sm" v-model="filters.evenCount">
-                    <option value="">Qualquer</option>
-                    <option value="0">0 Pares (Tudo Ímpar)</option>
-                    <option value="1">1 Par</option>
-                    <option value="2">2 Pares</option>
-                    <option value="3">3 Pares</option>
-                    <option value="4">4 Pares</option>
-                    <option value="5">5 Pares</option>
-                  </select>
+                  <label class="form-label small mb-0 fw-bold">Pares (Min-Max)</label>
+                  <div class="input-group input-group-sm">
+                    <input type="number" class="form-control" placeholder="0" v-model="filters.evenMin">
+                    <span class="input-group-text">-</span>
+                    <input type="number" class="form-control" placeholder="5" v-model="filters.evenMax">
+                  </div>
                 </div>
                 <div class="col-6">
-                  <label class="form-label small mb-0">Qtd Primos</label>
-                  <select class="form-select form-select-sm" v-model="filters.primeCount">
-                    <option value="">Qualquer</option>
-                    <option v-for="n in 6" :value="n-1">{{ n-1 }} Primos</option>
-                  </select>
+                  <label class="form-label small mb-0 fw-bold">Primos (Min-Max)</label>
+                  <div class="input-group input-group-sm">
+                    <input type="number" class="form-control" placeholder="0" v-model="filters.primeMin">
+                    <span class="input-group-text">-</span>
+                    <input type="number" class="form-control" placeholder="5" v-model="filters.primeMax">
+                  </div>
                 </div>
               </div>
 
               <div class="mb-2">
-                <label class="form-label small mb-0">Intervalo da Soma</label>
+                <label class="form-label small mb-0 fw-bold">Soma (Min-Max)</label>
                 <div class="input-group input-group-sm">
                   <input type="number" class="form-control" placeholder="Mín" v-model="filters.sumMin">
                   <span class="input-group-text">-</span>
