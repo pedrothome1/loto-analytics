@@ -1,0 +1,37 @@
+export function getAppData() {
+  return {
+    loading: false,
+    results: [],
+    sortOrder: 'desc',
+    filterStartDate: '',
+    freqSortColumn: 'count',
+    freqSortOrder: 'desc',
+    highlightNum: null,
+    currentPage: 1,
+    pageSize: 50,
+    generatedGame: null,
+    generatorModal: null,
+    genConfig: {
+      minSum: 140,
+      maxSum: 260,
+      evenCount: 'any',
+      primeCount: 'any',
+    },
+    detailsModal: null,
+    selectedDetails: null,
+    previousGamesCount: 0,
+    simModal: null,
+    simState: {
+      running: false,
+      attempts: 0,
+      startTime: null,
+      elapsedTime: '00:00',
+      targetGame: null,
+      bestTry: null,
+      quintilePattern: [],
+      chunks: [],
+    },
+    visitedBitmap: null,
+    combTable: null,
+  };
+}
