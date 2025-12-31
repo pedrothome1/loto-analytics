@@ -126,20 +126,20 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header bg-primary text-white">
-            <h5 class="modal-title"><i class="bi bi-eye"></i> Concurso {{ selectedDetails?.concurso }}</h5>
+            <h5 class="modal-title"><i class="bi bi-eye"></i> Concurso {{ selectedDetails?.game }}</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body text-center" v-if="selectedDetails">
             <p class="text-muted small mb-3">
-              {{ selectedDetails.data }}
+              {{ selectedDetails.date }}
             </p>
 
             <div class="mb-3">
-              <span v-for="bola in selectedDetails.numbersWithColor"
+              <span v-for="number in selectedDetails.numbersWithColor"
                 class="ball lg"
-                :style="bola.style"
+                :style="number.style"
                 style="width:40px;height:40px;line-height:40px;font-size:1.1rem;margin:2px;">
-                {{ bola.val }}
+                {{ number.val }}
               </span>
             </div>
 
@@ -172,9 +172,9 @@
 
           <div class="modal-body text-center" v-if="simState.targetGame">
 
-            <h6 class="text-muted small text-uppercase fw-bold">Alvo (Concurso {{ simState.targetGame.concurso }})</h6>
+            <h6 class="text-muted small text-uppercase fw-bold">Alvo (Concurso {{ simState.targetGame.game }})</h6>
             <div class="mb-3">
-              <span v-for="n in simState.targetGame.dezenas" class="ball bg-success">{{ n }}</span>
+              <span v-for="n in simState.targetGame.numbers" class="ball bg-success">{{ n }}</span>
             </div>
 
             <div v-if="!simState.running && simState.attempts === 0" class="py-3">
@@ -271,7 +271,7 @@
             </form>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="limparFiltros">Limpar</button>
+            <button type="button" class="btn btn-secondary" @click="cleanFilters">Limpar</button>
             <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Aplicar</button>
           </div>
         </div>
@@ -290,14 +290,14 @@
               Baseado em <strong>{{ sortedResults.length }}</strong> concursos.
             </p>
             <ul class="nav nav-tabs mb-3" id="statsTab" role="tablist">
-              <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#frequencia-content">Por Número</button></li>
-              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#soma-content">Soma</button></li>
-              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#parimpar-content">Par/Ímpar</button></li>
-              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#primos-content">Primos</button></li>
-              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#dezenas-content">Casas</button></li>
+              <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#frequency-content">Por Número</button></li>
+              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#sum-content">Soma</button></li>
+              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#evenodd-content">Par/Ímpar</button></li>
+              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#prime-content">Primos</button></li>
+              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#numbers-content">Casas</button></li>
             </ul>
             <div class="tab-content">
-              <div class="tab-pane fade show active" id="frequencia-content">
+              <div class="tab-pane fade show active" id="frequency-content">
                 <div class="alert alert-light small py-1 px-2 mb-2 border">
                   <i class="bi bi-info-circle"></i> Clique no cabeçalho para ordenar.
                 </div>
@@ -305,27 +305,27 @@
                   <table class="table table-bordered table-sm text-center align-middle">
                     <thead class="table-light sticky-top" style="top:0">
                       <tr>
-                        <th @click="sortFrequency('numero')">Dezena <i class="bi bi-filter"></i></th>
+                        <th @click="sortFrequency('number')">Dezena <i class="bi bi-filter"></i></th>
                         <th @click="sortFrequency('count')">Frequência <i class="bi bi-filter"></i></th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="row in frequencyTable" :key="row.numero">
-                        <td class="fw-bold">{{ row.numero }}</td>
+                      <tr v-for="row in frequencyTable" :key="row.number">
+                        <td class="fw-bold">{{ row.number }}</td>
                         <td :style="row.style">{{ row.count }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
-              <div class="tab-pane fade" id="soma-content">
+              <div class="tab-pane fade" id="sum-content">
                 <div v-for="(stat, index) in sumStats" :key="index" class="mb-2">
                   <div class="d-flex justify-content-between align-items-center mb-1 small">
                     <span class="badge bg-light text-dark border" style="width:80px">{{ stat.label }}</span>
                     <div class="flex-grow-1 mx-2">
                       <div class="progress" style="height:18px">
-                        <div class="progress-bar" :class="stat.percentTotal > 10 ? 'bg-success' : 'bg-secondary'" :style="{width: stat.percentBarra + '%'}">
-                          <span v-if="stat.percentBarra > 20" style="font-size:0.75rem">{{ stat.percentTotal }}%</span>
+                        <div class="progress-bar" :class="stat.percentTotal > 10 ? 'bg-success' : 'bg-secondary'" :style="{width: stat.percentBar + '%'}">
+                          <span v-if="stat.percentBar > 20" style="font-size:0.75rem">{{ stat.percentTotal }}%</span>
                         </div>
                       </div>
                     </div>
@@ -333,8 +333,8 @@
                   </div>
                 </div>
               </div>
-              <div class="tab-pane fade" id="parimpar-content">
-                <div v-for="(stat, index) in parImparStats" :key="index" class="mb-3">
+              <div class="tab-pane fade" id="evenodd-content">
+                <div v-for="(stat, index) in evenOddStats" :key="index" class="mb-3">
                   <div class="d-flex justify-content-between mb-1">
                     <span class="fw-bold">{{ stat.label }}</span><span>{{ stat.count }} ({{ stat.percent }}%)</span>
                   </div>
@@ -343,8 +343,8 @@
                   </div>
                 </div>
               </div>
-              <div class="tab-pane fade" id="primos-content">
-                <div v-for="(stat, index) in primosStats" :key="index" class="mb-3">
+              <div class="tab-pane fade" id="prime-content">
+                <div v-for="(stat, index) in primeStats" :key="index" class="mb-3">
                   <div class="d-flex justify-content-between mb-1">
                     <span class="fw-bold">{{ stat.label }}</span><span>{{ stat.count }} ({{ stat.percent }}%)</span>
                   </div>
@@ -353,7 +353,7 @@
                   </div>
                 </div>
               </div>
-              <div class="tab-pane fade" id="dezenas-content">
+              <div class="tab-pane fade" id="numbers-content">
                 <div v-for="(stat, index) in decadeStats" :key="index" class="mb-2">
                   <div class="d-flex justify-content-between align-items-center mb-1">
                     <span class="badge bg-secondary" style="width:65px">{{ stat.label }}</span>
@@ -414,10 +414,10 @@
               </thead>
               <tbody :class="{ 'table-dimmed': highlightNum !== null }">
                 <tr v-for="(row, index) in paginatedResults" :key="index">
-                  <td><strong>{{ row.concurso }}</strong></td>
-                  <td class="text-nowrap">{{ row.data }}</td>
+                  <td><strong>{{ row.game }}</strong></td>
+                  <td class="text-nowrap">{{ row.date }}</td>
                   <td class="text-nowrap">
-                    <span v-for="bola in row.dezenas" class="ball" :class="{ 'active-highlight': highlightNum === bola }" @click="toggleHighlight(bola)">{{ bola }}</span>
+                    <span v-for="number in row.numbers" class="ball" :class="{ 'active-highlight': highlightNum === number }" @click="toggleHighlight(number)">{{ number }}</span>
                   </td>
                   <td>
                     <button class="btn btn-sm btn-outline-secondary border-0" @click="openDetails(row)">
