@@ -5,13 +5,9 @@ import { appMethods } from './methods.js';
 const { createApp } = Vue;
 
 createApp({
-  data() {
-    return getAppData();
-  },
+  data: getAppData, // Sintaxe curta
   watch: {
-    sortedResults() {
-      this.currentPage = 1;
-    },
+    sortedResults() { this.currentPage = 1; }
   },
   computed: appComputed,
   methods: appMethods,

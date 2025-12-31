@@ -1,376 +1,284 @@
-export const appMethods = {
-  initBitSetSystem() {
-    this.combTable = Array(81)
-      .fill(0)
-      .map(() => Array(6).fill(0));
+import { LotteryConfig } from './config.js';
+import { getHeatMapColor, generatePrimes, analyzeGame, formatTime } from './utils.js';
 
-    for (let n = 0; n <= 80; n++) {
-      this.combTable[n][0] = 1;
-      for (let k = 1; k <= Math.min(n, 5); k++) {
-        this.combTable[n][k] =
-          this.combTable[n - 1][k - 1] + this.combTable[n - 1][k];
+const PRIMES = generatePrimes(LotteryConfig.totalNumbers);
+
+export const appMethods = {
+  // Inicializa Tabela Combinatória e BitSet dinamicamente
+  initBitSetSystem() {
+    const n = LotteryConfig.totalNumbers;
+    const k = LotteryConfig.pickSize;
+    
+    // Tabela Pascal C(n, k)
+    this.combTable = Array(n + 1).fill(0).map(() => Array(k + 1).fill(0));
+    for (let i = 0; i <= n; i++) {
+      this.combTable[i][0] = 1;
+      for (let j = 1; j <= Math.min(i, k); j++) {
+        this.combTable[i][j] = this.combTable[i-1][j-1] + this.combTable[i-1][j];
       }
     }
 
     if (!this.visitedBitmap) {
-      const totalCombinations = 24040016;
-      const byteSize = Math.ceil(totalCombinations / 8);
+      // Calcula total de combinações: C(n, k)
+      const totalCombs = this.combTable[n][k];
+      const byteSize = Math.ceil(totalCombs / 8);
       this.visitedBitmap = new Uint8Array(byteSize);
     } else {
       this.visitedBitmap.fill(0);
     }
   },
-  getGameIndex(numbersArray) {
-    let index = 0;
-    for (let i = 0; i < 5; i++) {
-      index += this.combTable[numbersArray[i] - 1][i + 1];
+
+  getGameIndex(nums) {
+    let idx = 0;
+    for (let i = 0; i < LotteryConfig.pickSize; i++) {
+      idx += this.combTable[nums[i] - 1][i + 1];
     }
-    return index;
+    return idx;
   },
-  openDetails(row) {
-    const currentGame = parseInt(row.game);
 
-    let filterDateObj = null;
+  openDetails(row) {
+    const gameId = parseInt(row.game);
+    const games = this.filterPastGames(gameId);
+
+    this.previousGamesCount = games.length;
+
+    // Mapa de Frequência Local
+    const counts = {};
+    games.forEach(g => g.numbers.forEach(n => counts[n] = (counts[n] || 0) + 1));
+    row.numbers.forEach(n => counts[n] = counts[n] || 0);
+
+    const vals = Object.values(counts);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+
+    const stats = analyzeGame(row.numbers, PRIMES);
+
+    this.selectedDetails = {
+      ...row,
+      ...stats,
+      numbersWithColor: row.numbers.map(n => ({
+        val: n,
+        style: getHeatMapColor(counts[n], min, max).bg ? 
+               { backgroundColor: getHeatMapColor(counts[n], min, max).bg, color: getHeatMapColor(counts[n], min, max).text } : {}
+      }))
+    };
+
+    if (!this.detailsModal) this.detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+    this.detailsModal.show();
+  },
+
+  // Helper para filtrar jogos anteriores (reutilizado)
+  filterPastGames(currentGameId) {
+    let filterTime = null;
     if (this.filterStartDate) {
-      const dateParts = this.filterStartDate.split('-');
-      filterDateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-      filterDateObj.setHours(0, 0, 0, 0);
+      const [y, m, d] = this.filterStartDate.split('-');
+      filterTime = new Date(y, m - 1, d).setHours(0,0,0,0);
     }
 
-    const pastGames = this.results.filter((gameResult) => {
-      const resultGameNumber = parseInt(gameResult.game);
-
-      if (resultGameNumber >= currentGame) return false;
-
-      if (filterDateObj) {
-        const resultDateParts = gameResult.date.split('/');
-        const resultDate = new Date(resultDateParts[2], resultDateParts[1] - 1, resultDateParts[0]);
-        resultDate.setHours(0, 0, 0, 0);
-        if (resultDate < filterDateObj) return false;
+    return this.results.filter(r => {
+      if (parseInt(r.game) >= currentGameId) return false;
+      if (filterTime) {
+        const [d, m, y] = r.date.split('/');
+        if (new Date(y, m - 1, d).setHours(0,0,0,0) < filterTime) return false;
       }
       return true;
     });
-
-    this.previousGamesCount = pastGames.length;
-
-    const countsMap = {};
-    pastGames.forEach((gameResult) =>
-      gameResult.numbers.forEach((ballNumber) => {
-        if (!countsMap[ballNumber]) countsMap[ballNumber] = 0;
-        countsMap[ballNumber]++;
-      }),
-    );
-
-    row.numbers.forEach((numberStr) => {
-      if (!countsMap[numberStr]) countsMap[numberStr] = 0;
-    });
-
-    const countValues = Object.values(countsMap);
-    const minCount = Math.min(...countValues);
-    const maxCount = Math.max(...countValues);
-    const range = maxCount - minCount || 1;
-
-    const getColor = (val) => {
-      const ratio = (val - minCount) / range;
-      let backgroundColor, textColor;
-      
-      if (ratio < 0.5) {
-        const normalizedRatio = ratio / 0.5;
-        const greenBlue = Math.round(255 * normalizedRatio);
-        backgroundColor = `rgb(255, ${greenBlue}, ${greenBlue})`;
-      } else {
-        const normalizedRatio = (ratio - 0.5) / 0.5;
-        const red = Math.round(255 * (1 - normalizedRatio));
-        const green = Math.round(255 - 75 * normalizedRatio);
-        const blue = Math.round(255 * (1 - normalizedRatio));
-        backgroundColor = `rgb(${red}, ${green}, ${blue})`;
-      }
-      textColor = ratio < 0.2 || ratio > 0.8 ? 'white' : 'black';
-      return {
-        backgroundColor: backgroundColor,
-        color: textColor,
-      };
-    };
-
-    const numbersAsInt = row.numbers.map((n) => parseInt(n));
-    const primeNumbersList = [
-      2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67,
-      71, 73, 79,
-    ];
-
-    this.selectedDetails = {
-      game: row.game,
-      date: row.date,
-      sum: numbersAsInt.reduce((acc, curr) => acc + curr, 0),
-      even: numbersAsInt.filter((n) => n % 2 === 0).length,
-      primes: numbersAsInt.filter((n) => primeNumbersList.includes(n)).length,
-      numbersWithColor: row.numbers.map((n) => ({
-        val: n,
-        style: getColor(countsMap[n] || 0),
-      })),
-    };
-
-    if (!this.detailsModal)
-      this.detailsModal = new bootstrap.Modal(
-        document.getElementById('detailsModal'),
-      );
-    this.detailsModal.show();
   },
-  getNumberStyle(numberStr) {
-    if (!this.frequencyTable) return {};
-    const foundItem = this.frequencyTable.find(
-      (item) => item.number === numberStr,
-    );
 
-    return foundItem ? foundItem.style : {};
+  getNumberStyle(numStr) {
+    const item = this.frequencyTable?.find(i => i.number === numStr);
+    return item ? item.style : {};
   },
-  genericStats(countFunction, labelFunction, sortKey) {
+
+  // Stats genérico mantido, mas limpo
+  genericStats(countFn, labelFn, sortKey) {
     if (!this.sortedResults.length) return [];
-    
-    const statsMap = {};
-    const totalGames = this.sortedResults.length;
-    
-    this.sortedResults.forEach((gameResult) => {
-      const value = countFunction(gameResult);
-      const key = labelFunction(value);
-      
-      if (!statsMap[key])
-        statsMap[key] = {
-          count: 0,
-          [sortKey]: value,
-        };
-      statsMap[key].count++;
+    const stats = {};
+    const total = this.sortedResults.length;
+
+    this.sortedResults.forEach(r => {
+      const val = countFn(r);
+      const key = labelFn(val);
+      if (!stats[key]) stats[key] = { count: 0, [sortKey]: val };
+      stats[key].count++;
     });
-    
-    return Object.keys(statsMap)
-      .map((key) => ({
-        label: key,
-        count: statsMap[key].count,
-        percent: ((statsMap[key].count / totalGames) * 100).toFixed(1),
-        [sortKey]: statsMap[key][sortKey],
-      }))
-      .sort((a, b) => a[sortKey] - b[sortKey]);
+
+    return Object.keys(stats).map(k => ({
+      label: k,
+      count: stats[k].count,
+      percent: ((stats[k].count / total) * 100).toFixed(1),
+      [sortKey]: stats[k][sortKey]
+    })).sort((a, b) => a[sortKey] - b[sortKey]);
   },
-  handleFileUpload(event) {
-    const file = event.target.files[0];
+
+  handleFileUpload(e) {
+    const file = e.target.files[0];
     if (!file) return;
-    
+
     this.loading = true;
     this.results = [];
-    this.highlightNum = null;
     
     Papa.parse(file, {
       header: false,
       skipEmptyLines: true,
-      complete: (parseResult) => {
-        this.results = parseResult.data
-          .slice(1)
-          .map((row) => {
-            if (row.length < 3) return null;
-            return {
-              game: row[0],
-              date: row[1],
-              numbers: row
-                .slice(2, 7)
-                .filter((cell) => cell && cell.trim())
-                .map((cell) => parseInt(cell))
-                .sort((numA, numB) => numA - numB)
-                .map((num) => num.toString().padStart(2, '0')),
-            };
-          })
-          .filter((item) => item);
-          
+      complete: (res) => {
+        this.results = res.data.slice(1).map(row => {
+          if (row.length < 3) return null;
+          return {
+            game: row[0],
+            date: row[1],
+            numbers: row.slice(2, 2 + LotteryConfig.pickSize)
+                        .map(n => parseInt(n).toString().padStart(2, '0'))
+                        .sort((a, b) => a - b)
+          };
+        }).filter(Boolean);
+        
         this.loading = false;
         this.currentPage = 1;
-      },
+      }
     });
   },
+
   toggleSort() {
     this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
   },
-  sortFrequency(column) {
-    if (this.freqSortColumn === column)
+
+  sortFrequency(col) {
+    if (this.freqSortColumn === col) {
       this.freqSortOrder = this.freqSortOrder === 'asc' ? 'desc' : 'asc';
-    else {
-      this.freqSortColumn = column;
+    } else {
+      this.freqSortColumn = col;
       this.freqSortOrder = 'desc';
     }
   },
+
   cleanFilters() {
     this.filterStartDate = '';
   },
-  toggleHighlight(number) {
-    this.highlightNum = this.highlightNum === number ? null : number;
+
+  toggleHighlight(num) {
+    this.highlightNum = this.highlightNum === num ? null : num;
   },
+
   nextPage() {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-      document.getElementById('tabela-topo')?.scrollIntoView({
-        behavior: 'smooth',
-      });
-    }
+    if (this.currentPage < this.totalPages) this.changePage(1);
   },
+
   prevPage() {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-      document.getElementById('tabela-topo')?.scrollIntoView({
-        behavior: 'smooth',
-      });
-    }
+    if (this.currentPage > 1) this.changePage(-1);
   },
-  getProgressBarColor(percent) {
-    return percent > 30 ? 'bg-success' : percent > 15 ? 'bg-info' : 'bg-secondary';
+
+  changePage(dir) {
+    this.currentPage += dir;
+    document.getElementById('tabela-topo')?.scrollIntoView({ behavior: 'smooth' });
   },
+
+  getProgressBarColor(p) {
+    return p > 30 ? 'bg-success' : p > 15 ? 'bg-info' : 'bg-secondary';
+  },
+
   openGenerator() {
-    if (!this.generatorModal)
-      this.generatorModal = new bootstrap.Modal(
-        document.getElementById('generatorModal'),
-      );
+    if (!this.generatorModal) this.generatorModal = new bootstrap.Modal(document.getElementById('generatorModal'));
     this.generateOptimizedGame();
     this.generatorModal.show();
   },
+
+  // Validador compartilhado entre Gerador e Simulação
+  isValidGame(nums, config) {
+    const stats = analyzeGame(nums, PRIMES);
+    
+    // Soma
+    if (config.minSum && (stats.sum < config.minSum || stats.sum > config.maxSum)) return false;
+    
+    // Pares
+    if (config.evenCount !== 'any') {
+      if (stats.even !== parseInt(config.evenCount)) return false;
+    } else {
+      // Regra básica: evitar todos pares ou todos ímpares
+      if (stats.even === 0 || stats.even === LotteryConfig.pickSize) return false;
+    }
+
+    // Primos
+    if (config.primeCount !== 'any') {
+      if (stats.primes !== parseInt(config.primeCount)) return false;
+    } else {
+      if (stats.primes > Math.ceil(LotteryConfig.pickSize / 1.5)) return false;
+    }
+
+    return { isValid: true, stats };
+  },
+
   generateOptimizedGame() {
     this.generatedGame = null;
 
     setTimeout(() => {
-      let sortedNumbersList;
-      if (this.frequencyTable && this.frequencyTable.length > 0) {
-        const sortedTable = [...this.frequencyTable].sort(
-          (a, b) => b.count - a.count,
-        );
-        sortedNumbersList = sortedTable.map((item) => parseInt(item.number));
+      // Prepara pool de números baseada em frequência
+      let pool;
+      if (this.frequencyTable?.length) {
+        pool = [...this.frequencyTable].sort((a, b) => b.count - a.count).map(i => parseInt(i.number));
       } else {
-        sortedNumbersList = Array.from(
-          {
-            length: 80,
-          },
-          (_, i) => i + 1,
-        );
+        pool = Array.from({ length: LotteryConfig.totalNumbers }, (_, i) => i + 1);
       }
 
+      // Cria chunks (quintis)
+      const chunkSize = Math.ceil(pool.length / LotteryConfig.pickSize);
       const chunks = [];
-      const chunkSize = Math.ceil(sortedNumbersList.length / 5);
-      for (let i = 0; i < 5; i++) {
-        chunks.push(sortedNumbersList.slice(i * chunkSize, (i + 1) * chunkSize));
+      for (let i = 0; i < LotteryConfig.pickSize; i++) {
+        chunks.push(pool.slice(i * chunkSize, (i + 1) * chunkSize));
       }
 
-      let bestGame = null;
+      let best = null;
       let attempts = 0;
-      const maxAttempts = 5000;
 
-      const primeNumbersList = [
-        2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61,
-        67, 71, 73, 79,
-      ];
-
-      while (!bestGame && attempts < maxAttempts) {
+      while (!best && attempts < 5000) {
         attempts++;
-
-        let candidate = chunks.map((chunk) => {
-          if (!chunk || chunk.length === 0)
-            return Math.floor(Math.random() * 80) + 1;
-          return chunk[Math.floor(Math.random() * chunk.length)];
+        
+        // Sorteia 1 de cada chunk para garantir espalhamento
+        let candidate = chunks.map(chunk => {
+          return chunk.length ? chunk[Math.floor(Math.random() * chunk.length)] : Math.floor(Math.random() * LotteryConfig.totalNumbers) + 1;
         });
 
         candidate = [...new Set(candidate)].sort((a, b) => a - b);
-        if (candidate.length !== 5) continue;
+        if (candidate.length !== LotteryConfig.pickSize) continue;
 
-        const sum = candidate.reduce((acc, curr) => acc + curr, 0);
-        const evens = candidate.filter((n) => n % 2 === 0).length;
-        const primes = candidate.filter((n) => primeNumbersList.includes(n)).length;
-
-        if (sum < this.genConfig.minSum || sum > this.genConfig.maxSum)
-          continue;
-
-        if (this.genConfig.evenCount !== 'any') {
-          if (evens !== parseInt(this.genConfig.evenCount)) continue;
-        } else {
-          if (evens === 0 || evens === 5) continue;
+        const check = this.isValidGame(candidate, this.genConfig);
+        
+        if (check && check.isValid) {
+          best = {
+            numbers: candidate.map(n => n.toString().padStart(2, '0')),
+            ...check.stats
+          };
         }
-
-        if (this.genConfig.primeCount !== 'any') {
-          if (primes !== parseInt(this.genConfig.primeCount)) continue;
-        } else {
-          if (primes > 3) continue;
-        }
-
-        bestGame = {
-          numbers: candidate.map((n) => n.toString().padStart(2, '0')),
-          sum: sum,
-          even: evens,
-          primes: primes,
-        };
       }
 
-      if (bestGame) {
-        this.generatedGame = bestGame;
+      if (best) {
+        this.generatedGame = best;
       } else {
-        alert(
-          'Não foi possível gerar um jogo com essas regras exatas após 5000 tentativas. Tente aumentar a faixa de soma ou mudar os pares/primos.',
-        );
+        alert('Não foi possível gerar um jogo com essas regras exatas. Tente flexibilizar os filtros.');
       }
     }, 50);
   },
-  openSimulation(row) {
-    const currentGame = parseInt(row.game);
-    let filterDateObj = null;
-    if (this.filterStartDate) {
-      const dateParts = this.filterStartDate.split('-');
-      filterDateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-      filterDateObj.setHours(0, 0, 0, 0);
-    }
-    const pastGames = this.results.filter((gameResult) => {
-      const resultGameNumber = parseInt(gameResult.game);
-      if (resultGameNumber >= currentGame) return false;
-      if (filterDateObj) {
-        const resultDateParts = gameResult.date.split('/');
-        const resultDate = new Date(resultDateParts[2], resultDateParts[1] - 1, resultDateParts[0]);
-        resultDate.setHours(0, 0, 0, 0);
-        if (resultDate < filterDateObj) return false;
-      }
-      return true;
-    });
 
-    const countsMap = {};
-    pastGames.forEach((gameResult) =>
-      gameResult.numbers.forEach((ballNumber) => {
-        countsMap[ballNumber] = (countsMap[ballNumber] || 0) + 1;
-      }),
-    );
+  openSimulation(row) {
+    const stats = analyzeGame(row.numbers, PRIMES);
     
-    let sortedNumbersList =
-      pastGames.length > 0
-        ? Array.from(
-            {
-              length: 80,
-            },
-            (_, i) => (i + 1).toString().padStart(2, '0'),
-          ).sort((a, b) => (countsMap[b] || 0) - (countsMap[a] || 0))
-        : Array.from(
-            {
-              length: 80,
-            },
-            (_, i) => (i + 1).toString().padStart(2, '0'),
-          );
+    // Calcula Padrão de Quintis do Alvo
+    // Precisamos recriar os chunks baseados na frequência daquele momento
+    const pastGames = this.filterPastGames(parseInt(row.game));
+    const counts = {};
+    pastGames.forEach(g => g.numbers.forEach(n => counts[n] = (counts[n] || 0) + 1));
+    
+    const sortedNums = Array.from({length: LotteryConfig.totalNumbers}, (_, i) => i + 1)
+      .sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
 
     const chunks = [];
-    for (let i = 0; i < 5; i++)
-      chunks.push(sortedNumbersList.slice(i * 16, (i + 1) * 16));
+    const chunkSize = Math.ceil(LotteryConfig.totalNumbers / LotteryConfig.pickSize);
+    for(let i=0; i<LotteryConfig.pickSize; i++) chunks.push(sortedNums.slice(i*16, (i+1)*16));
 
-    const targetNums = row.numbers.map((n) => parseInt(n));
-    const sum = targetNums.reduce((acc, curr) => acc + curr, 0);
-    const even = targetNums.filter((n) => n % 2 === 0).length;
-    const primeNumbersList = [
-      2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67,
-      71, 73, 79,
-    ];
-    const primes = targetNums.filter((n) => primeNumbersList.includes(n)).length;
-
-    const quintilePattern = [0, 0, 0, 0, 0];
-    targetNums.forEach((n) => {
-      const numberString = n.toString().padStart(2, '0');
-      const chunkIndex = chunks.findIndex((chunk) => chunk.includes(numberString));
-      if (chunkIndex !== -1) quintilePattern[chunkIndex]++;
+    const quintilePattern = Array(LotteryConfig.pickSize).fill(0);
+    row.numbers.forEach(n => {
+      const idx = chunks.findIndex(c => c.includes(parseInt(n)));
+      if (idx !== -1) quintilePattern[idx]++;
     });
 
     this.simState = {
@@ -379,139 +287,105 @@ export const appMethods = {
       attempts: 0,
       startTime: null,
       elapsedTime: '00:00',
-      targetGame: {
-        game: row.game,
-        numbers: row.numbers,
-        sum,
-        even,
-        primes,
-      },
-      bestTry: ['..', '..', '..', '..', '..'],
-      quintilePattern: quintilePattern,
-      chunks: chunks,
+      targetGame: { ...row, ...stats },
+      bestTry: Array(LotteryConfig.pickSize).fill('..'),
+      quintilePattern,
+      chunks
     };
 
-    if (!this.simModal)
-      this.simModal = new bootstrap.Modal(
-        document.getElementById('simModal'),
-      );
+    if (!this.simModal) this.simModal = new bootstrap.Modal(document.getElementById('simModal'));
     this.simModal.show();
   },
+
   startSim() {
     this.simState.running = true;
     this.simState.startTime = Date.now();
     this.simState.attempts = 0;
-
     this.initBitSetSystem();
-
     this.runSimLoop();
   },
+
   runSimLoop() {
     if (!this.simState.running) return;
 
     const { chunks, quintilePattern, targetGame, mode } = this.simState;
     const targetStr = targetGame.numbers.join(',');
-    const primeNumbersList = [
-      2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67,
-      71, 73, 79,
-    ];
-
-    const batchSize = mode === 'random' ? 5000 : 2000;
+    const batchSize = mode === 'random' ? LotteryConfig.simBatchSize.random : LotteryConfig.simBatchSize.smart;
+    
     let batch = 0;
 
     while (batch < batchSize) {
       batch++;
-
       let candidate = [];
 
       if (mode === 'random') {
-        while (candidate.length < 5) {
-          const randomNumber = Math.floor(Math.random() * 80) + 1;
-          if (!candidate.includes(randomNumber)) candidate.push(randomNumber);
+        while (candidate.length < LotteryConfig.pickSize) {
+          const rnd = Math.floor(Math.random() * LotteryConfig.totalNumbers) + 1;
+          if (!candidate.includes(rnd)) candidate.push(rnd);
         }
-
         candidate.sort((a, b) => a - b);
       } else {
-        for (let i = 0; i < 5; i++) {
-          const countNeeded = quintilePattern[i];
-          if (countNeeded > 0) {
+        // Smart Generation (Quintiles)
+        for (let i = 0; i < LotteryConfig.pickSize; i++) {
+          const needed = quintilePattern[i];
+          if (needed > 0) {
             const chunk = chunks[i];
             const picked = [];
-            while (picked.length < countNeeded) {
-              const randomNumber = chunk[Math.floor(Math.random() * chunk.length)];
-
-              if (!picked.includes(randomNumber)) picked.push(randomNumber);
+            while(picked.length < needed) {
+              const rnd = chunk[Math.floor(Math.random() * chunk.length)];
+              if (!picked.includes(rnd)) picked.push(rnd);
             }
             candidate.push(...picked);
           }
         }
-        candidate.sort((a, b) => parseInt(a) - parseInt(b));
+        candidate.sort((a, b) => a - b);
       }
 
-      const gameIndex = this.getGameIndex(candidate);
+      // BitSet Check
+      const idx = this.getGameIndex(candidate);
+      const byteIdx = Math.floor(idx / 8);
+      const bitIdx = idx % 8;
 
-      const byteIndex = Math.floor(gameIndex / 8);
-      const bitIndex = gameIndex % 8;
-
-      if ((this.visitedBitmap[byteIndex] & (1 << bitIndex)) !== 0) {
-        continue;
-      }
-
-      this.visitedBitmap[byteIndex] |= 1 << bitIndex;
-
+      if ((this.visitedBitmap[byteIdx] & (1 << bitIdx)) !== 0) continue;
+      this.visitedBitmap[byteIdx] |= (1 << bitIdx);
+      
       this.simState.attempts++;
 
+      // Validations (Smart Mode)
       if (mode === 'smart') {
-        const sum = candidate.reduce((acc, curr) => acc + parseInt(curr), 0);
+        const sum = candidate.reduce((a, b) => a + b, 0);
         if (sum !== targetGame.sum) continue;
+        
+        const even = candidate.filter(n => n % 2 === 0).length;
+        if (even !== targetGame.even) continue;
 
-        const evens = candidate.filter((n) => parseInt(n) % 2 === 0).length;
-        if (evens !== targetGame.even) continue;
-
-        const primes = candidate.filter((n) =>
-          primeNumbersList.includes(parseInt(n)),
-        ).length;
+        const primes = candidate.filter(n => PRIMES.includes(n)).length;
         if (primes !== targetGame.primes) continue;
       }
 
-      const candidateFormatted = candidate.map((n) =>
-        n.toString().padStart(2, '0'),
-      );
+      // Check Win
+      const formatted = candidate.map(n => n.toString().padStart(2, '0'));
+      if (batch % 500 === 0) this.simState.bestTry = formatted;
 
-      if (batch % 500 === 0) this.simState.bestTry = candidateFormatted;
-
-      if (candidateFormatted.join(',') === targetStr) {
-        this.simState.bestTry = candidateFormatted;
+      if (formatted.join(',') === targetStr) {
+        this.simState.bestTry = formatted;
         this.simState.running = false;
-
         setTimeout(() => {
-          alert(
-            `ACERTOU (${mode === 'smart' ? 'Inteligente' : 'Aleatório'})!\nJogos Únicos Testados: ${this.simState.attempts.toLocaleString()}\nTempo: ${this.simState.elapsedTime}`,
-          );
+          alert(`ACERTOU (${mode === 'smart' ? 'Inteligente' : 'Aleatório'})!\nJogos: ${this.simState.attempts.toLocaleString()}\nTempo: ${this.simState.elapsedTime}`);
         }, 10);
         return;
       }
     }
 
-    const diff = Math.floor((Date.now() - this.simState.startTime) / 1000);
-    const minutes = Math.floor(diff / 60)
-      .toString()
-      .padStart(2, '0');
-    const seconds = (diff % 60).toString().padStart(2, '0');
-    this.simState.elapsedTime = `${minutes}:${seconds}`;
+    this.simState.elapsedTime = formatTime(Date.now() - this.simState.startTime);
+    if (this.simState.running) requestAnimationFrame(this.runSimLoop);
+  },
 
-    if (this.simState.running) {
-      requestAnimationFrame(this.runSimLoop);
-    }
-  },
-  stopSim() {
-    this.simState.running = false;
-  },
+  stopSim() { this.simState.running = false; },
   resetSim() {
     this.simState.running = false;
     this.simState.attempts = 0;
-
     this.simState.elapsedTime = '00:00';
-    this.simState.bestTry = ['..', '..', '..', '..', '..'];
-  },
+    this.simState.bestTry = Array(LotteryConfig.pickSize).fill('..');
+  }
 };

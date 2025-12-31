@@ -1,156 +1,133 @@
+import { LotteryConfig } from './config.js';
+import { getHeatMapColor, generatePrimes } from './utils.js';
+
+// Cache simples para não recalcular primos a cada render
+const PRIMES = generatePrimes(LotteryConfig.totalNumbers);
+
 export const appComputed = {
   sortedResults() {
-    let resultList = [...this.results];
+    let list = [...this.results];
     
     if (this.filterStartDate) {
-      const dateParts = this.filterStartDate.split('-');
-      const filterDateObject = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-      filterDateObject.setHours(0, 0, 0, 0);
+      const [y, m, d] = this.filterStartDate.split('-');
+      const filterTime = new Date(y, m - 1, d).setHours(0, 0, 0, 0);
 
-      resultList = resultList.filter((gameResult) => {
-        const resultDateParts = gameResult.date.split('/');
-        const resultDateObject = new Date(resultDateParts[2], resultDateParts[1] - 1, resultDateParts[0]);
-        resultDateObject.setHours(0, 0, 0, 0);
-        return resultDateObject >= filterDateObject;
+      list = list.filter(r => {
+        const [day, month, year] = r.date.split('/');
+        return new Date(year, month - 1, day).setHours(0, 0, 0, 0) >= filterTime;
       });
     }
 
-    return resultList.sort((gameA, gameB) => {
-      const gameNumberA = parseInt(gameA.game);
-      const gameNumberB = parseInt(gameB.game);
-      return this.sortOrder === 'asc' ? gameNumberA - gameNumberB : gameNumberB - gameNumberA;
+    return list.sort((a, b) => {
+      const diff = parseInt(a.game) - parseInt(b.game);
+      return this.sortOrder === 'asc' ? diff : -diff;
     });
   },
+
   totalPages() {
     return Math.ceil(this.sortedResults.length / this.pageSize);
   },
+
   paginatedResults() {
-    const startIndex = (this.currentPage - 1) * this.pageSize;
-    return this.sortedResults.slice(startIndex, startIndex + this.pageSize);
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.sortedResults.slice(start, start + this.pageSize);
   },
+
   frequencyTable() {
-    if (this.sortedResults.length === 0) return [];
-    
-    const countsMap = {};
-    for (let i = 1; i <= 80; i++) {
-        countsMap[i.toString().padStart(2, '0')] = 0;
-    }
-
-    this.sortedResults.forEach((gameResult) =>
-      gameResult.numbers.forEach((ballNumber) => {
-        if (countsMap[ballNumber] !== undefined) countsMap[ballNumber]++;
-      }),
-    );
-
-    const countValues = Object.values(countsMap);
-    const minCount = Math.min(...countValues);
-    const maxCount = Math.max(...countValues);
-    const range = maxCount - minCount || 1;
-
-    return Object.keys(countsMap)
-      .map((numberKey) => {
-        const countValue = countsMap[numberKey];
-        const ratio = (countValue - minCount) / range;
-        
-        let color;
-        if (ratio < 0.5) {
-           const normalizedRatio = ratio / 0.5;
-           const greenBlue = Math.round(255 * normalizedRatio);
-           color = `rgb(255, ${greenBlue}, ${greenBlue})`;
-        } else {
-           const normalizedRatio = (ratio - 0.5) / 0.5;
-           const red = Math.round(255 * (1 - normalizedRatio));
-           const green = Math.round(255 - (75 * normalizedRatio));
-           const blue = Math.round(255 * (1 - normalizedRatio));
-           color = `rgb(${red}, ${green}, ${blue})`;
-        }
-
-        return {
-          number: numberKey,
-          count: countValue,
-          style: {
-            backgroundColor: color,
-            color: ratio < 0.2 || ratio > 0.8 ? 'white' : 'black',
-          },
-        };
-      })
-      .sort((itemA, itemB) => {
-        if (this.freqSortOrder === 'asc') {
-          return this.freqSortColumn === 'number'
-            ? parseInt(itemA.number) - parseInt(itemB.number)
-            : itemA.count - itemB.count;
-        } else {
-          return this.freqSortColumn === 'number'
-            ? parseInt(itemB.number) - parseInt(itemA.number)
-            : itemB.count - itemA.count;
-        }
-      });
-  },
-  evenOddStats() {
-    return this.genericStats(
-      (gameResult) => gameResult.numbers.filter((n) => n % 2 === 0).length,
-      (evenCount) => `${evenCount} Pares / ${5 - evenCount} Ímpares`,
-      'evenCount',
-    );
-  },
-  primeStats() {
-    const primeNumbersList = [
-      2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67,
-      71, 73, 79,
-    ];
-    return this.genericStats(
-      (gameResult) => gameResult.numbers.filter((n) => primeNumbersList.includes(parseInt(n))).length,
-      (primeCount) => (primeCount === 1 ? '1 Primo' : `${primeCount} Primos`),
-      'quantity',
-    );
-  },
-  decadeStats() {
     if (!this.sortedResults.length) return [];
     
-    const decadeCounts = Array(9).fill(0);
+    const counts = {};
+    for (let i = 1; i <= LotteryConfig.totalNumbers; i++) {
+      counts[i.toString().padStart(2, '0')] = 0;
+    }
+
+    this.sortedResults.forEach(r => r.numbers.forEach(n => counts[n]++));
+
+    const vals = Object.values(counts);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+
+    return Object.keys(counts).map(num => {
+      const count = counts[num];
+      const { bg, text } = getHeatMapColor(count, min, max);
+      
+      return {
+        number: num,
+        count,
+        style: { backgroundColor: bg, color: text }
+      };
+    }).sort((a, b) => {
+      if (this.freqSortColumn === 'number') {
+        const diff = parseInt(a.number) - parseInt(b.number);
+        return this.freqSortOrder === 'asc' ? diff : -diff;
+      }
+      return this.freqSortOrder === 'asc' ? a.count - b.count : b.count - a.count;
+    });
+  },
+
+  evenOddStats() {
+    return this.genericStats(
+      r => r.numbers.filter(n => n % 2 === 0).length,
+      c => `${c} Pares / ${LotteryConfig.pickSize - c} Ímpares`,
+      'even'
+    );
+  },
+
+  primeStats() {
+    return this.genericStats(
+      r => r.numbers.filter(n => PRIMES.includes(parseInt(n))).length,
+      c => c === 1 ? '1 Primo' : `${c} Primos`,
+      'qty'
+    );
+  },
+
+  decadeStats() {
+    if (!this.sortedResults.length) return [];
+    // Calcula décadas dinamicamente baseado no total de números
+    const decadesCount = Math.ceil(LotteryConfig.totalNumbers / 10);
+    const counts = Array(decadesCount).fill(0);
     
-    this.sortedResults.forEach((gameResult) =>
-      gameResult.numbers.forEach((ballNumber) => {
-          const decadeIndex = Math.floor(parseInt(ballNumber) / 10);
-          decadeCounts[decadeIndex]++;
-      }),
+    this.sortedResults.forEach(r => 
+      r.numbers.forEach(n => counts[Math.floor((parseInt(n) - 1) / 10)]++)
     );
     
-    return decadeCounts.map((count, index) => ({
-      label: `${index * 10}-${index * 10 + 9}`
-        .replace(/^(\d)-/, '0$1-')
-        .replace(/-(\d)$/, '-0$1'),
-      count: count,
-    }));
+    return counts.map((count, i) => {
+      const start = i * 10;
+      const label = `${start}-${start + 9}`.replace(/\b\d\b/g, '0$&'); // Padroniza 00-09
+      return { label, count };
+    });
   },
+
   maxDecadeCount() {
-    return Math.max(...(this.decadeStats.map((d) => d.count) || 1));
+    return Math.max(...(this.decadeStats.map(d => d.count) || [1]));
   },
+
   sumStats() {
-    const statsMap = {};
-    const totalGames = this.sortedResults.length;
+    const stats = {};
+    const total = this.sortedResults.length;
     
-    this.sortedResults.forEach((gameResult) => {
-      const sumTotal = gameResult.numbers.reduce((acc, curr) => acc + parseInt(curr), 0);
-      const intervalKey = Math.floor(sumTotal / 20) * 20;
+    this.sortedResults.forEach(r => {
+      const sum = r.numbers.reduce((acc, n) => acc + parseInt(n), 0);
+      const interval = Math.floor(sum / 20) * 20;
       
-      if (!statsMap[intervalKey])
-        statsMap[intervalKey] = {
-          label: `${intervalKey}-${intervalKey + 19}`,
-          count: 0,
-          intervalStart: intervalKey,
+      if (!stats[interval]) {
+        stats[interval] = { 
+          label: `${interval}-${interval + 19}`, 
+          count: 0, 
+          start: interval 
         };
-      statsMap[intervalKey].count++;
+      }
+      stats[interval].count++;
     });
 
-    const maxFrequency = Math.max(...Object.values(statsMap).map((stat) => stat.count));
+    const max = Math.max(...Object.values(stats).map(s => s.count));
     
-    return Object.values(statsMap)
-      .map((statItem) => ({
-        ...statItem,
-        percentTotal: ((statItem.count / totalGames) * 100).toFixed(1),
-        percentBar: (statItem.count / maxFrequency) * 100,
+    return Object.values(stats)
+      .map(s => ({
+        ...s,
+        percentTotal: ((s.count / total) * 100).toFixed(1),
+        percentBar: (s.count / max) * 100
       }))
-      .sort((a, b) => a.intervalStart - b.intervalStart);
-  },
+      .sort((a, b) => a.start - b.start);
+  }
 };
