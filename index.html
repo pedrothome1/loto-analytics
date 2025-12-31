@@ -463,14 +463,22 @@
     </div>
 
     <div class="container">
-      <div class="card mb-4 shadow-sm" v-if="results.length === 0">
-        <div class="card-body">
-          <h5 class="card-title">Carregar Arquivo</h5>
-          <div class="mb-3">
-            <input class="form-control" type="file" accept=".csv" @change="handleFileUpload">
-          </div>
-          <div v-if="loading" class="text-center">
-            <div class="spinner-border text-primary"></div>
+      <div class="card mb-3">
+        <div class="card-body bg-light pt-2 pb-3">
+          <div class="row g-2 align-items-end">
+            <div class="col-5 col-md-4">
+              <label class="form-label fw-bold small mb-1">Loteria</label>
+              <select class="form-select" :value="lotteryConfig.id" @change="setLottery($event.target.value)">
+                <option v-for="preset in presets" :key="preset.id" :value="preset.id">
+                  {{ preset.name }}
+                </option>
+              </select>
+            </div>
+      
+            <div class="col-7 col-md-8">
+              <label class="form-label fw-bold small mb-1">Arquivo CSV</label>
+              <input type="file" class="form-control" @change="handleFileUpload" accept=".csv">
+            </div>
           </div>
         </div>
       </div>
@@ -541,7 +549,7 @@
   <script type="module" src="js/main.js"></script>
 
   <script src="//cdn.jsdelivr.net/npm/eruda"></script>
-  <!--<script>eruda.init();</script>-->
+  <script>eruda.init();</script>
 
 </body>
 </html>

@@ -1,18 +1,15 @@
-import { LotteryConfig } from './config.js';
-import { getHeatMapColor, analyzeGame, generatePrimes } from './utils.js';
-
-const PRIMES = generatePrimes(LotteryConfig.totalNumbers);
+import { AppConfig } from './config.js';
+import { getHeatMapColor, analyzeGame } from './utils.js';
 
 export const UiModule = {
   data() {
     return {
       currentPage: 1,
-      pageSize: LotteryConfig.pageSize,
+      pageSize: AppConfig.pageSize,
       highlightNum: null,
       detailsModal: null,
       selectedDetails: null,
       previousGamesCount: 0,
-      
       freqSortColumn: 'count',
       freqSortOrder: 'desc',
     };
@@ -33,8 +30,8 @@ export const UiModule = {
     openDetails(row) {
       const gameId = parseInt(row.game);
       const games = this.filterPastGames(gameId);
-
       this.previousGamesCount = games.length;
+
       const counts = {};
       games.forEach(g => g.numbers.forEach(n => counts[n] = (counts[n] || 0) + 1));
       row.numbers.forEach(n => counts[n] = counts[n] || 0);
@@ -43,7 +40,7 @@ export const UiModule = {
       const min = Math.min(...vals);
       const max = Math.max(...vals);
 
-      const stats = analyzeGame(row.numbers, PRIMES);
+      const stats = analyzeGame(row.numbers, this.primes);
 
       this.selectedDetails = {
         ...row, ...stats,

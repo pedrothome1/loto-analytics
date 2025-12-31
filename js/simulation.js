@@ -1,47 +1,34 @@
-import { LotteryConfig } from './config.js';
-import { analyzeGame, formatTime, generatePrimes } from './utils.js';
-
-const PRIMES = generatePrimes(LotteryConfig.totalNumbers);
+import { analyzeGame, formatTime } from './utils.js';
 
 export const SimulationModule = {
   data() {
     return {
       simModal: null,
       simState: {
-        running: false,
-        mode: 'smart',
-        attempts: 0,
-        startTime: null,
-        elapsedTime: '00:00',
-        targetGame: null,
-        bestTry: null,
-        quintilePattern: [],
-        chunks: [],
-        customConfig: {
-          minSum: LotteryConfig.limits.minSum, maxSum: LotteryConfig.limits.maxSum,
-          evenMin: LotteryConfig.limits.evenMin, evenMax: LotteryConfig.limits.evenMax,
-          primeMin: LotteryConfig.limits.primeMin, primeMax: LotteryConfig.limits.primeMax
-        },
+        running: false, mode: 'smart', attempts: 0, startTime: null, elapsedTime: '00:00',
+        targetGame: null, bestTry: null, quintilePattern: [], chunks: [],
+        customConfig: { minSum: 0, maxSum: 0, evenMin: '', evenMax: '', primeMin: '', primeMax: '' },
       }
     };
   },
   methods: {
     openSimulation(row) {
-      const stats = analyzeGame(row.numbers, PRIMES);
+      const config = this.lotteryConfig;
+      const stats = analyzeGame(row.numbers, this.primes);
       const pastGames = this.filterPastGames(parseInt(row.game));
       const counts = {};
       pastGames.forEach(g => g.numbers.forEach(n => counts[n] = (counts[n] || 0) + 1));
       
-      const sortedNums = Array.from({length: LotteryConfig.totalNumbers}, (_, i) => i + 1)
+      const sortedNums = Array.from({length: config.totalNumbers}, (_, i) => i + 1)
         .sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
 
       const chunks = [];
-      const chunkSize = Math.ceil(LotteryConfig.totalNumbers / LotteryConfig.pickSize);
-      for(let i=0; i<LotteryConfig.pickSize; i++) {
+      const chunkSize = Math.ceil(config.totalNumbers / config.pickSize);
+      for(let i=0; i<config.pickSize; i++) {
           chunks.push(sortedNums.slice(i * chunkSize, (i+1) * chunkSize));
       }
 
-      const quintilePattern = Array(LotteryConfig.pickSize).fill(0);
+      const quintilePattern = Array(config.pickSize).fill(0);
       row.numbers.forEach(n => {
         const idx = chunks.findIndex(c => c.includes(parseInt(n)));
         if (idx !== -1) quintilePattern[idx]++;
@@ -51,8 +38,13 @@ export const SimulationModule = {
         ...this.simState,
         running: false, mode: 'smart', attempts: 0, startTime: null, elapsedTime: '00:00',
         targetGame: { ...row, ...stats },
-        bestTry: Array(LotteryConfig.pickSize).fill('..'),
-        quintilePattern, chunks
+        bestTry: Array(config.pickSize).fill('..'),
+        quintilePattern, chunks,
+        customConfig: {
+            minSum: config.limits.minSum, maxSum: config.limits.maxSum,
+            evenMin: config.limits.evenMin, evenMax: config.limits.evenMax,
+            primeMin: config.limits.primeMin, primeMax: config.limits.primeMax
+        }
       };
 
       if (!this.simModal) this.simModal = new bootstrap.Modal(document.getElementById('simModal'));
@@ -73,13 +65,14 @@ export const SimulationModule = {
       this.simState.running = true;
       this.simState.startTime = Date.now();
       this.simState.attempts = 0;
-      this.initBitSetSystem(); // From CoreModule
+      this.initBitSetSystem();
       this.runSimLoop();
     },
     runSimLoop() {
       if (!this.simState.running) return;
 
       const { chunks, quintilePattern, targetGame, mode, customConfig } = this.simState;
+      const config = this.lotteryConfig;
       const targetStr = targetGame.numbers.join(',');
       const frameStart = performance.now();
       let safetyCounter = 0;
@@ -90,14 +83,14 @@ export const SimulationModule = {
         let candidate = [];
 
         if (mode === 'random') {
-          while (candidate.length < LotteryConfig.pickSize) {
-            const rnd = Math.floor(Math.random() * LotteryConfig.totalNumbers) + 1;
+          while (candidate.length < config.pickSize) {
+            const rnd = Math.floor(Math.random() * config.totalNumbers) + 1;
             if (!candidate.includes(rnd)) candidate.push(rnd);
           }
           candidate.sort((a, b) => a - b);
         } 
         else if (mode === 'smart') {
-           for (let i = 0; i < LotteryConfig.pickSize; i++) {
+           for (let i = 0; i < config.pickSize; i++) {
               const needed = quintilePattern[i];
               if (needed > 0) {
                 const chunk = chunks[i];
@@ -114,39 +107,43 @@ export const SimulationModule = {
             candidate.sort((a, b) => a - b);
         }
         else if (mode === 'manual') {
-          let groupIndices = Array.from({ length: LotteryConfig.pickSize }, (_, i) => i);
+          let groupIndices = Array.from({ length: config.pickSize }, (_, i) => i);
           for (let i = groupIndices.length - 1; i > 0; i--) {
               const j = Math.floor(Math.random() * (i + 1));
               [groupIndices[i], groupIndices[j]] = [groupIndices[j], groupIndices[i]];
           }
           if (Math.random() < 0.30) {
-             const idxToChange = Math.floor(Math.random() * LotteryConfig.pickSize);
+             const idxToChange = Math.floor(Math.random() * config.pickSize);
              groupIndices[idxToChange] = Math.floor(Math.random() * chunks.length);
           }
-          while (candidate.length < LotteryConfig.pickSize) {
+          while (candidate.length < config.pickSize) {
              const chunkIdx = groupIndices.length > 0 ? groupIndices.shift() : Math.floor(Math.random() * chunks.length);
              const chunk = chunks[chunkIdx];
              if (chunk && chunk.length > 0) {
                const rnd = chunk[Math.floor(Math.random() * chunk.length)];
                if (!candidate.includes(rnd)) candidate.push(rnd);
              } else {
-               const r = Math.floor(Math.random() * LotteryConfig.totalNumbers) + 1;
+               const r = Math.floor(Math.random() * config.totalNumbers) + 1;
                if (!candidate.includes(r)) candidate.push(r);
              }
           }
           candidate.sort((a, b) => a - b);
         }
 
-        const idx = this.getGameIndex(candidate); // From CoreModule
-        const byteIdx = Math.floor(idx / 8);
-        const bitIdx = idx % 8;
-
-        if ((this.visitedBitmap[byteIdx] & (1 << bitIdx)) !== 0) {
-          safetyCounter++;
-          continue;
+        // Verificação BitSet (apenas se memória permitiu criar)
+        if (this.visitedBitmap) {
+            const idx = this.getGameIndex(candidate);
+            if (idx !== -1) {
+                const byteIdx = Math.floor(idx / 8);
+                const bitIdx = idx % 8;
+                if ((this.visitedBitmap[byteIdx] & (1 << bitIdx)) !== 0) {
+                    safetyCounter++;
+                    continue;
+                }
+                this.visitedBitmap[byteIdx] |= (1 << bitIdx);
+            }
         }
         
-        this.visitedBitmap[byteIdx] |= (1 << bitIdx);
         this.simState.attempts++;
 
         let isValid = true;
@@ -154,10 +151,10 @@ export const SimulationModule = {
           const sum = candidate.reduce((a, b) => a + b, 0);
           if (sum !== targetGame.sum) isValid = false;
           if (isValid && candidate.filter(n => n % 2 === 0).length !== targetGame.even) isValid = false;
-          if (isValid && candidate.filter(n => PRIMES.includes(n)).length !== targetGame.primes) isValid = false;
+          if (isValid && candidate.filter(n => this.primes.includes(n)).length !== targetGame.primes) isValid = false;
         } 
         else if (mode === 'manual') {
-          const stats = analyzeGame(candidate, PRIMES);
+          const stats = analyzeGame(candidate, this.primes);
           if (stats.sum < customConfig.minSum || stats.sum > customConfig.maxSum) isValid = false;
           if (isValid && customConfig.evenMin !== '' && stats.even < parseInt(customConfig.evenMin)) isValid = false;
           if (isValid && customConfig.evenMax !== '' && stats.even > parseInt(customConfig.evenMax)) isValid = false;
@@ -187,7 +184,7 @@ export const SimulationModule = {
       this.simState.running = false;
       this.simState.attempts = 0;
       this.simState.elapsedTime = '00:00';
-      this.simState.bestTry = Array(LotteryConfig.pickSize).fill('..');
+      this.simState.bestTry = Array(this.lotteryConfig.pickSize).fill('..');
     }
   }
 };

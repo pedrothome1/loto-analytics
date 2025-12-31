@@ -4,9 +4,7 @@ export const FiltersModule = {
       sortOrder: 'desc',
       filters: {
         startDate: '', endDate: '', day: '', month: '', year: '', leapYear: false, 
-        evenMin: '', evenMax: '', 
-        primeMin: '', primeMax: '', 
-        sumMin: '', sumMax: ''
+        evenMin: '', evenMax: '', primeMin: '', primeMax: '', sumMin: '', sumMax: ''
       }
     };
   },
@@ -41,7 +39,6 @@ export const FiltersModule = {
         const [y, m, d] = f.startDate.split('-');
         if (s.time < new Date(y, m - 1, d).setHours(0,0,0,0)) return false;
       }
-      
       if (f.day && s.d !== parseInt(f.day)) return false;
       if (f.month && s.m !== parseInt(f.month)) return false;
       if (f.year && s.y !== parseInt(f.year)) return false;
@@ -70,8 +67,6 @@ export const FiltersModule = {
         return this.checkFilters(r);
       });
     },
-    toggleSort() { 
-      this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'; 
-    }
+    toggleSort() { this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'; }
   }
 };

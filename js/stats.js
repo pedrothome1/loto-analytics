@@ -1,7 +1,4 @@
-import { LotteryConfig } from './config.js';
-import { getHeatMapColor, generatePrimes } from './utils.js';
-
-const PRIMES = generatePrimes(LotteryConfig.totalNumbers);
+import { getHeatMapColor } from './utils.js';
 
 export const StatsModule = {
   computed: {
@@ -9,11 +6,14 @@ export const StatsModule = {
       if (!this.sortedResults.length) return [];
       
       const counts = {};
-      for (let i = 1; i <= LotteryConfig.totalNumbers; i++) {
+      const totalNums = this.lotteryConfig.totalNumbers;
+      
+      for (let i = 1; i <= totalNums; i++) {
         counts[i.toString().padStart(2, '0')] = 0;
       }
 
       this.sortedResults.forEach(r => r.numbers.forEach(n => counts[n]++));
+
       const vals = Object.values(counts);
       const min = Math.min(...vals);
       const max = Math.max(...vals);
@@ -33,18 +33,18 @@ export const StatsModule = {
     evenOddStats() {
       return this.genericStats(
         r => r.numbers.filter(n => n % 2 === 0).length,
-        c => `${c} Pares / ${LotteryConfig.pickSize - c} Ímpares`, 'even'
+        c => `${c} Pares / ${this.lotteryConfig.pickSize - c} Ímpares`, 'even'
       );
     },
     primeStats() {
       return this.genericStats(
-        r => r.numbers.filter(n => PRIMES.includes(parseInt(n))).length,
+        r => r.numbers.filter(n => this.primes.includes(parseInt(n))).length,
         c => c === 1 ? '1 Primo' : `${c} Primos`, 'qty'
       );
     },
     decadeStats() {
       if (!this.sortedResults.length) return [];
-      const decadesCount = Math.ceil(LotteryConfig.totalNumbers / 10);
+      const decadesCount = Math.ceil(this.lotteryConfig.totalNumbers / 10);
       const counts = Array(decadesCount).fill(0);
       
       this.sortedResults.forEach(r => 
@@ -81,14 +81,12 @@ export const StatsModule = {
       if (!this.sortedResults.length) return [];
       const stats = {};
       const total = this.sortedResults.length;
-
       this.sortedResults.forEach(r => {
         const val = countFn(r);
         const key = labelFn(val);
         if (!stats[key]) stats[key] = { count: 0, [sortKey]: val };
         stats[key].count++;
       });
-
       return Object.keys(stats).map(k => ({
         label: k, count: stats[k].count, percent: ((stats[k].count / total) * 100).toFixed(1), [sortKey]: stats[k][sortKey]
       })).sort((a, b) => a[sortKey] - b[sortKey]);
