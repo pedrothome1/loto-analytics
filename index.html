@@ -15,7 +15,7 @@
         <div class="d-flex justify-content-between align-items-center mb-2">
           <div>
             <h1 class="h4 mb-0"><i class="bi bi-graph-up"></i> Loto Analytics</h1>
-            <small class="text-light opacity-75">Quina Inteligente</small>
+            <small class="text-light opacity-75">Loteria Inteligente</small>
           </div>
         </div>
 
@@ -256,7 +256,6 @@
       </div>
     </div>
 
-
     <div class="modal fade" id="filterModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -392,7 +391,12 @@
 
       <div v-if="results.length > 0" class="card shadow-sm">
         <div class="card-header bg-white d-flex justify-content-between align-items-center" id="tabela-topo">
-          <h5 class="mb-0"><span class="badge bg-primary me-2">Pág {{ currentPage }}/{{ totalPages }}</span></h5>
+          <h5 class="mb-0">
+            <span class="badge bg-primary me-2">Pág {{ currentPage }}/{{ totalPages }}</span>
+            <span class="badge bg-secondary text-white">
+              {{ sortedResults.length }} Concursos
+            </span>
+          </h5>
           <div class="btn-group">
             <button class="btn btn-outline-secondary btn-sm" @click="prevPage" :disabled="currentPage === 1"><i class="bi bi-chevron-left"></i></button>
             <button class="btn btn-outline-secondary btn-sm" @click="nextPage" :disabled="currentPage === totalPages"><i class="bi bi-chevron-right"></i></button>
@@ -411,10 +415,10 @@
                   </th>
                   <th class="text-nowrap">Data</th>
                   <th>Dezenas</th>
-                  <th>Detalhes</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
-              <tbody :class="{ 'table-dimmed': highlightNum !== null }">
+              <tbody>
                 <tr v-for="(row, index) in paginatedResults" :key="index">
                   <td><strong>{{ row.game }}</strong></td>
                   <td class="text-nowrap">{{ row.date }}</td>
@@ -422,13 +426,15 @@
                     <span v-for="number in row.numbers" class="ball" :class="{ 'active-highlight': highlightNum === number }" @click="toggleHighlight(number)">{{ number }}</span>
                   </td>
                   <td>
-                    <button class="btn btn-sm btn-outline-secondary border-0" @click="openDetails(row)">
-                      <i class="bi bi-eye-fill"></i>
-                    </button>
-
-                    <button class="btn btn-sm btn-outline-warning border-0 text-dark" @click="openSimulation(row)" title="Simular acerto">
-                      <i class="bi bi-cpu-fill"></i>
-                    </button>
+                    <div class="d-flex align-items-center">
+                      <button class="btn btn-sm btn-outline-secondary border-0" @click="openDetails(row)">
+                        <i class="bi bi-eye-fill"></i>
+                      </button>
+  
+                      <button class="btn btn-sm btn-outline-warning border-0 text-dark" @click="openSimulation(row)" title="Simular acerto">
+                        <i class="bi bi-cpu-fill"></i>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
