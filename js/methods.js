@@ -1,16 +1,13 @@
 import { LotteryConfig } from './config.js';
 import { getHeatMapColor, generatePrimes, analyzeGame, formatTime } from './utils.js';
 
-// Gera lista de primos dinamicamente baseada no total de bolas da config
 const PRIMES = generatePrimes(LotteryConfig.totalNumbers);
 
 export const appMethods = {
-  // Inicializa Tabela Combinatória e BitSet dinamicamente
   initBitSetSystem() {
     const n = LotteryConfig.totalNumbers;
     const k = LotteryConfig.pickSize;
     
-    // Tabela Pascal C(n, k) para cálculo combinatório
     this.combTable = Array(n + 1).fill(0).map(() => Array(k + 1).fill(0));
     for (let i = 0; i <= n; i++) {
       this.combTable[i][0] = 1;
@@ -20,8 +17,6 @@ export const appMethods = {
     }
 
     if (!this.visitedBitmap) {
-      // Calcula total de combinações dinamicamente: C(n, k)
-      // Para Quina (80, 5) dá 24.040.016. Para Mega (60, 6) daria 50.063.860
       const totalCombs = this.combTable[n][k];
       const byteSize = Math.ceil(totalCombs / 8);
       this.visitedBitmap = new Uint8Array(byteSize);
@@ -38,13 +33,91 @@ export const appMethods = {
     return idx;
   },
 
+  handleFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    this.loading = true;
+    this.results = [];
+    
+    Papa.parse(file, {
+      header: false,
+      skipEmptyLines: true,
+      complete: (res) => {
+        this.results = res.data.slice(1).map(row => {
+          if (row.length < 3) return null;
+          
+          const nums = row.slice(2, 2 + LotteryConfig.pickSize)
+                          .map(n => parseInt(n).toString().padStart(2, '0'))
+                          .sort((a, b) => a - b);
+          
+          const [day, month, year] = row[1].split('/');
+          const dateObj = new Date(year, month - 1, day);
+          const stats = analyzeGame(nums, PRIMES); 
+
+          return {
+            game: row[0],
+            date: row[1],
+            numbers: nums,
+            stats: {
+              ...stats,
+              d: parseInt(day),
+              m: parseInt(month),
+              y: parseInt(year),
+              time: dateObj.setHours(0,0,0,0),
+              isLeap: (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0)
+            }
+          };
+        }).filter(Boolean);
+        
+        this.loading = false;
+        this.currentPage = 1;
+      }
+    });
+  },
+
+  checkFilters(row) {
+    const f = this.filters;
+    const s = row.stats;
+
+    if (f.startDate) {
+      const [y, m, d] = f.startDate.split('-');
+      if (s.time < new Date(y, m - 1, d).setHours(0,0,0,0)) return false;
+    }
+    
+    if (f.day && s.d !== parseInt(f.day)) return false;
+    if (f.month && s.m !== parseInt(f.month)) return false;
+    if (f.year && s.y !== parseInt(f.year)) return false;
+    if (f.leapYear && !s.isLeap) return false;
+
+    if (f.evenCount !== '' && s.even !== parseInt(f.evenCount)) return false;
+    if (f.primeCount !== '' && s.primes !== parseInt(f.primeCount)) return false;
+    if (f.sumMin !== '' && s.sum < parseInt(f.sumMin)) return false;
+    if (f.sumMax !== '' && s.sum > parseInt(f.sumMax)) return false;
+
+    return true;
+  },
+
+  cleanFilters() {
+    this.filters = {
+      startDate: '', endDate: '', day: '', month: '', year: '', 
+      leapYear: false, evenCount: '', primeCount: '', sumMin: '', sumMax: ''
+    };
+  },
+
+  filterPastGames(currentGameId) {
+    return this.results.filter(r => {
+      if (parseInt(r.game) >= currentGameId) return false;
+      return this.checkFilters(r);
+    });
+  },
+
   openDetails(row) {
     const gameId = parseInt(row.game);
     const games = this.filterPastGames(gameId);
 
     this.previousGamesCount = games.length;
 
-    // Mapa de Frequência Local
     const counts = {};
     games.forEach(g => g.numbers.forEach(n => counts[n] = (counts[n] || 0) + 1));
     row.numbers.forEach(n => counts[n] = counts[n] || 0);
@@ -67,23 +140,6 @@ export const appMethods = {
 
     if (!this.detailsModal) this.detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
     this.detailsModal.show();
-  },
-
-  filterPastGames(currentGameId) {
-    let filterTime = null;
-    if (this.filterStartDate) {
-      const [y, m, d] = this.filterStartDate.split('-');
-      filterTime = new Date(y, m - 1, d).setHours(0,0,0,0);
-    }
-
-    return this.results.filter(r => {
-      if (parseInt(r.game) >= currentGameId) return false;
-      if (filterTime) {
-        const [d, m, y] = r.date.split('/');
-        if (new Date(y, m - 1, d).setHours(0,0,0,0) < filterTime) return false;
-      }
-      return true;
-    });
   },
 
   getNumberStyle(numStr) {
@@ -111,34 +167,6 @@ export const appMethods = {
     })).sort((a, b) => a[sortKey] - b[sortKey]);
   },
 
-  handleFileUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    this.loading = true;
-    this.results = [];
-    
-    Papa.parse(file, {
-      header: false,
-      skipEmptyLines: true,
-      complete: (res) => {
-        this.results = res.data.slice(1).map(row => {
-          if (row.length < 3) return null;
-          return {
-            game: row[0],
-            date: row[1],
-            numbers: row.slice(2, 2 + LotteryConfig.pickSize)
-                        .map(n => parseInt(n).toString().padStart(2, '0'))
-                        .sort((a, b) => a - b)
-          };
-        }).filter(Boolean);
-        
-        this.loading = false;
-        this.currentPage = 1;
-      }
-    });
-  },
-
   toggleSort() { this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'; },
   sortFrequency(col) {
     if (this.freqSortColumn === col) {
@@ -148,9 +176,8 @@ export const appMethods = {
       this.freqSortOrder = 'desc';
     }
   },
-  cleanFilters() { this.filterStartDate = ''; },
-  toggleHighlight(num) { this.highlightNum = this.highlightNum === num ? null : num; },
   
+  toggleHighlight(num) { this.highlightNum = this.highlightNum === num ? null : num; },
   nextPage() { if (this.currentPage < this.totalPages) this.changePage(1); },
   prevPage() { if (this.currentPage > 1) this.changePage(-1); },
   changePage(dir) {
@@ -165,7 +192,6 @@ export const appMethods = {
     this.generatorModal.show();
   },
 
-  // Validador compartilhado
   isValidGame(nums, config) {
     const stats = analyzeGame(nums, PRIMES);
     
@@ -180,7 +206,6 @@ export const appMethods = {
     if (config.primeCount !== 'any') {
       if (stats.primes !== parseInt(config.primeCount)) return false;
     } else {
-      // No modo automático, evitamos extremos, mas permitimos variações
       if (stats.primes > Math.ceil(LotteryConfig.pickSize / 1.5)) return false;
     }
 
@@ -191,7 +216,6 @@ export const appMethods = {
     this.generatedGame = null;
 
     setTimeout(() => {
-      // 1. Prepara pool de números (Frequência ou Base)
       let sortedNumbersList;
       if (this.frequencyTable?.length) {
         sortedNumbersList = [...this.frequencyTable]
@@ -201,7 +225,6 @@ export const appMethods = {
         sortedNumbersList = Array.from({ length: LotteryConfig.totalNumbers }, (_, i) => i + 1);
       }
 
-      // 2. Prepara Chunking (para estratégia Fase 1)
       const chunks = [];
       const chunkSize = Math.ceil(sortedNumbersList.length / LotteryConfig.pickSize);
       for (let i = 0; i < LotteryConfig.pickSize; i++) {
@@ -211,9 +234,6 @@ export const appMethods = {
       let bestGame = null;
       let attempts = 0;
       
-      // Estratégia Híbrida:
-      // Fase 1 (Smart): Tenta pegar 1 de cada quintil (até 2000 tentativas)
-      // Fase 2 (Fallback): Relaxa a regra dos quintis se não encontrar (até 10000 tentativas)
       const maxAttemptsSmart = 2000;
       const maxAttemptsTotal = 10000;
 
@@ -222,13 +242,11 @@ export const appMethods = {
         let candidate = [];
 
         if (attempts < maxAttemptsSmart) {
-          // Fase 1: Smart Quintiles
           candidate = chunks.map(chunk => {
             if (!chunk || !chunk.length) return Math.floor(Math.random() * LotteryConfig.totalNumbers) + 1;
             return chunk[Math.floor(Math.random() * chunk.length)];
           });
         } else {
-          // Fase 2: Aleatório Ponderado (Pega dos TOP 50 mais frequentes para manter qualidade)
           const poolSize = Math.min(50, sortedNumbersList.length);
           const activePool = sortedNumbersList.slice(0, poolSize);
           
@@ -262,7 +280,6 @@ export const appMethods = {
   openSimulation(row) {
     const stats = analyzeGame(row.numbers, PRIMES);
     
-    // Recalcula padrão de quintis baseado no passado
     const pastGames = this.filterPastGames(parseInt(row.game));
     const counts = {};
     pastGames.forEach(g => g.numbers.forEach(n => counts[n] = (counts[n] || 0) + 1));
@@ -326,7 +343,6 @@ export const appMethods = {
         }
         candidate.sort((a, b) => a - b);
       } else {
-        // Smart Generation (Quintiles)
         for (let i = 0; i < LotteryConfig.pickSize; i++) {
           const needed = quintilePattern[i];
           if (needed > 0) {
@@ -342,7 +358,6 @@ export const appMethods = {
         candidate.sort((a, b) => a - b);
       }
 
-      // BitSet Check
       const idx = this.getGameIndex(candidate);
       const byteIdx = Math.floor(idx / 8);
       const bitIdx = idx % 8;
@@ -352,7 +367,6 @@ export const appMethods = {
       
       this.simState.attempts++;
 
-      // Validations
       if (mode === 'smart') {
         const sum = candidate.reduce((a, b) => a + b, 0);
         if (sum !== targetGame.sum) continue;

@@ -22,7 +22,7 @@
         <div class="d-flex gap-2 flex-wrap">
           <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#filterModal">
             <i class="bi bi-funnel"></i> Filtros
-            <span v-if="filterStartDate" class="badge bg-warning text-dark rounded-pill ms-1">!</span>
+            <span v-if="activeFiltersCount > 0" class="badge bg-warning text-dark rounded-pill ms-1">{{ activeFiltersCount }}</span>
           </button>
           <button v-if="results.length > 0" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#statsModal">
             <i class="bi bi-pie-chart-fill"></i> Estatísticas
@@ -156,7 +156,7 @@
                 <span>Primos:</span> <span class="fw-bold">{{ selectedDetails.primes }}</span>
               </li>
               <li class="list-group-item bg-light text-muted text-center" style="font-size: 0.75rem">
-                Cores baseadas em {{ previousGamesCount }} sorteios anteriores a este.
+                Cores baseadas em {{ previousGamesCount }} sorteios anteriores a este (com filtros aplicados).
               </li>
             </ul>
           </div>
@@ -188,7 +188,7 @@
                     <input class="form-check-input" type="radio" name="simMode" id="modeSmart" value="smart" v-model="simState.mode">
                     <label class="form-check-label small" for="modeSmart">
                       <strong>Usar "Informação Privilegiada"</strong><br>
-                      <span class="text-muted">O robô sabe a soma, pares/ímpares, primos e padrão de frequência exatos deste sorteio. Tenta gerar jogos iguais.</span>
+                      <span class="text-muted">O robô sabe a soma, pares/ímpares, primos e padrão de frequência exatos deste sorteio.</span>
                     </label>
                   </div>
 
@@ -196,7 +196,7 @@
                     <input class="form-check-input" type="radio" name="simMode" id="modeRandom" value="random" v-model="simState.mode">
                     <label class="form-check-label small" for="modeRandom">
                       <strong>Aleatório Puro (Cego)</strong><br>
-                      <span class="text-muted">O robô não sabe nada. Apenas chuta 5 números aleatórios entre 1 e 80 repetidamente.</span>
+                      <span class="text-muted">O robô não sabe nada. Apenas chuta 5 números aleatórios.</span>
                     </label>
                   </div>
                 </div>
@@ -226,10 +226,6 @@
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div class="alert alert-warning small mt-3 py-2" v-if="simState.mode === 'random'">
-                <i class="bi bi-exclamation-triangle"></i> Modo Aleatório é muito mais lento pois não filtra jogos "impossíveis".
               </div>
             </div>
 
@@ -265,9 +261,71 @@
           </div>
           <div class="modal-body">
             <form>
-              <div class="mb-3">
-                <label for="startDate" class="form-label">A partir da data:</label>
-                <input type="date" class="form-control" id="startDate" v-model="filterStartDate">
+              <h6 class="border-bottom pb-1 mb-2">Data e Tempo</h6>
+              <div class="row g-2 mb-2">
+                <div class="col-6">
+                  <label class="form-label small mb-0">A partir de:</label>
+                  <input type="date" class="form-control form-control-sm" v-model="filters.startDate">
+                </div>
+                <div class="col-6">
+                  <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="leapCheck" v-model="filters.leapYear">
+                    <label class="form-check-label small" for="leapCheck">Apenas Ano Bissexto</label>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="row g-2 mb-3">
+                <div class="col-4">
+                  <label class="form-label small mb-0">Dia</label>
+                  <input type="number" class="form-control form-control-sm" placeholder="1-31" v-model="filters.day">
+                </div>
+                <div class="col-4">
+                  <label class="form-label small mb-0">Mês</label>
+                  <select class="form-select form-select-sm" v-model="filters.month">
+                    <option value="">Todos</option>
+                    <option value="1">Jan</option><option value="2">Fev</option><option value="3">Mar</option>
+                    <option value="4">Abr</option><option value="5">Mai</option><option value="6">Jun</option>
+                    <option value="7">Jul</option><option value="8">Ago</option><option value="9">Set</option>
+                    <option value="10">Out</option><option value="11">Nov</option><option value="12">Dez</option>
+                  </select>
+                </div>
+                <div class="col-4">
+                  <label class="form-label small mb-0">Ano</label>
+                  <input type="number" class="form-control form-control-sm" placeholder="ex: 2023" v-model="filters.year">
+                </div>
+              </div>
+
+              <h6 class="border-bottom pb-1 mb-2">Características do Jogo</h6>
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label small mb-0">Qtd Pares</label>
+                  <select class="form-select form-select-sm" v-model="filters.evenCount">
+                    <option value="">Qualquer</option>
+                    <option value="0">0 Pares (Tudo Ímpar)</option>
+                    <option value="1">1 Par</option>
+                    <option value="2">2 Pares</option>
+                    <option value="3">3 Pares</option>
+                    <option value="4">4 Pares</option>
+                    <option value="5">5 Pares</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small mb-0">Qtd Primos</label>
+                  <select class="form-select form-select-sm" v-model="filters.primeCount">
+                    <option value="">Qualquer</option>
+                    <option v-for="n in 6" :value="n-1">{{ n-1 }} Primos</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small mb-0">Intervalo da Soma</label>
+                <div class="input-group input-group-sm">
+                  <input type="number" class="form-control" placeholder="Mín" v-model="filters.sumMin">
+                  <span class="input-group-text">-</span>
+                  <input type="number" class="form-control" placeholder="Máx" v-model="filters.sumMax">
+                </div>
               </div>
             </form>
           </div>

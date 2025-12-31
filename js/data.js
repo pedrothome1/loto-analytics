@@ -5,19 +5,30 @@ export function getAppData() {
     loading: false,
     results: [],
     
-    // UI State
     sortOrder: 'desc',
-    filterStartDate: '',
+    
+    filters: {
+      startDate: '',
+      endDate: '',
+      day: '',       
+      month: '',     
+      year: '',      
+      leapYear: false, 
+      evenCount: '', 
+      primeCount: '',
+      sumMin: '',    
+      sumMax: ''
+    },
+
     freqSortColumn: 'count',
     freqSortOrder: 'desc',
     highlightNum: null,
     currentPage: 1,
     pageSize: LotteryConfig.pageSize,
     
-    // Modals & Features
     generatedGame: null,
     generatorModal: null,
-    genConfig: { ...LotteryConfig.defaultGenConfig }, // Clone para evitar mutação da config
+    genConfig: { ...LotteryConfig.defaultGenConfig }, 
     
     detailsModal: null,
     selectedDetails: null,
@@ -35,7 +46,6 @@ export function getAppData() {
       chunks: [],
     },
     
-    // Optimization
     visitedBitmap: null,
     combTable: null,
   };

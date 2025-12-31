@@ -1,22 +1,11 @@
 import { LotteryConfig } from './config.js';
 import { getHeatMapColor, generatePrimes } from './utils.js';
 
-// Cache simples para não recalcular primos a cada render
 const PRIMES = generatePrimes(LotteryConfig.totalNumbers);
 
 export const appComputed = {
   sortedResults() {
-    let list = [...this.results];
-    
-    if (this.filterStartDate) {
-      const [y, m, d] = this.filterStartDate.split('-');
-      const filterTime = new Date(y, m - 1, d).setHours(0, 0, 0, 0);
-
-      list = list.filter(r => {
-        const [day, month, year] = r.date.split('/');
-        return new Date(year, month - 1, day).setHours(0, 0, 0, 0) >= filterTime;
-      });
-    }
+    let list = this.results.filter(r => this.checkFilters(r));
 
     return list.sort((a, b) => {
       const diff = parseInt(a.game) - parseInt(b.game);
@@ -24,8 +13,22 @@ export const appComputed = {
     });
   },
 
+  activeFiltersCount() {
+    let c = 0;
+    const f = this.filters;
+    if (f.startDate) c++;
+    if (f.day) c++;
+    if (f.month) c++;
+    if (f.year) c++;
+    if (f.leapYear) c++;
+    if (f.evenCount !== '') c++;
+    if (f.primeCount !== '') c++;
+    if (f.sumMin !== '' || f.sumMax !== '') c++;
+    return c;
+  },
+
   totalPages() {
-    return Math.ceil(this.sortedResults.length / this.pageSize);
+    return Math.ceil(this.sortedResults.length / this.pageSize) || 1;
   },
 
   paginatedResults() {
@@ -83,7 +86,6 @@ export const appComputed = {
 
   decadeStats() {
     if (!this.sortedResults.length) return [];
-    // Calcula décadas dinamicamente baseado no total de números
     const decadesCount = Math.ceil(LotteryConfig.totalNumbers / 10);
     const counts = Array(decadesCount).fill(0);
     
@@ -93,7 +95,7 @@ export const appComputed = {
     
     return counts.map((count, i) => {
       const start = i * 10;
-      const label = `${start}-${start + 9}`.replace(/\b\d\b/g, '0$&'); // Padroniza 00-09
+      const label = `${start}-${start + 9}`.replace(/\b\d\b/g, '0$&'); 
       return { label, count };
     });
   },
