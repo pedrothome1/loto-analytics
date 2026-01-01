@@ -1,4 +1,5 @@
 import { analyzeGame } from './utils.js';
+import { StorageService } from './storage.js';
 
 export const GeneratorModule = {
   data() {
@@ -6,15 +7,27 @@ export const GeneratorModule = {
       generatedGame: null,
       generatorModal: null,
       genConfig: { 
-        minSum: 0, maxSum: 999, // Valores placeholder, atualizados pelo CoreModule
+        minSum: 0, maxSum: 999,
         evenMin: '', evenMax: '', primeMin: '', primeMax: ''
       }
     };
   },
+  watch: {
+    genConfig: {
+      handler(newVal) {
+        if (this.lotteryConfig && this.lotteryConfig.id) {
+           clearTimeout(this._saveGenTimer);
+           this._saveGenTimer = setTimeout(() => {
+             StorageService.set('settings', `gen_${this.lotteryConfig.id}`, newVal);
+           }, 500);
+        }
+      },
+      deep: true
+    }
+  },
   methods: {
     openGenerator() {
       if (!this.generatorModal) this.generatorModal = new bootstrap.Modal(document.getElementById('generatorModal'));
-      // Sincroniza config caso não tenha sido feito
       if (this.genConfig.minSum === 0) {
           this.genConfig.minSum = this.lotteryConfig.limits.minSum;
           this.genConfig.maxSum = this.lotteryConfig.limits.maxSum;

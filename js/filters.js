@@ -1,3 +1,5 @@
+import { StorageService } from './storage.js';
+
 export const FiltersModule = {
   data() {
     return {
@@ -7,6 +9,20 @@ export const FiltersModule = {
         evenMin: '', evenMax: '', primeMin: '', primeMax: '', sumMin: '', sumMax: ''
       }
     };
+  },
+  watch: {
+    // Salva filtros automaticamente 500ms após parar de digitar (debounce simples)
+    filters: {
+      handler(newVal) {
+        if (this.lotteryConfig && this.lotteryConfig.id) {
+          clearTimeout(this._saveFilterTimer);
+          this._saveFilterTimer = setTimeout(() => {
+            StorageService.set('settings', `filters_${this.lotteryConfig.id}`, newVal);
+          }, 500);
+        }
+      },
+      deep: true
+    }
   },
   computed: {
     sortedResults() {
@@ -31,6 +47,10 @@ export const FiltersModule = {
     }
   },
   methods: {
+    restoreFilters(saved) {
+      // Método chamado pelo CoreModule ao carregar dados
+      this.filters = { ...this.filters, ...saved };
+    },
     checkFilters(row) {
       const f = this.filters;
       const s = row.stats;

@@ -130,7 +130,6 @@ export const SimulationModule = {
           candidate.sort((a, b) => a - b);
         }
 
-        // Verificação BitSet (apenas se memória permitiu criar)
         if (this.visitedBitmap) {
             const idx = this.getGameIndex(candidate);
             if (idx !== -1) {

@@ -1,5 +1,6 @@
 import { LotteryPresets } from './config.js';
 import { generatePrimes, analyzeGame } from './utils.js';
+import { StorageService } from './storage.js';
 
 export const CoreModule = {
   data() {
@@ -8,37 +9,86 @@ export const CoreModule = {
       presets: LotteryPresets,
       loading: false,
       results: [],
-      resultsCache: {}, // NOVO: Guarda os dados de cada loteria
+      resultsCache: {}, 
       visitedBitmap: null,
       combTable: null
     };
   },
+  
+  async created() {
+    // Ao iniciar o app, carrega a última loteria usada
+    try {
+      await StorageService.init();
+      const lastId = await StorageService.get('settings', 'lastLotteryId');
+      
+      if (lastId && this.presets[lastId]) {
+        // Usa setLottery mas evita loop de salvar 'lastLotteryId' imediatamente
+        await this.loadLotteryData(lastId);
+      } else {
+        await this.loadLotteryData('quina');
+      }
+    } catch (e) {
+      console.error("Erro ao iniciar DB", e);
+    }
+  },
+
   computed: {
     primes() {
       return generatePrimes(this.lotteryConfig.totalNumbers);
     }
   },
+  
   methods: {
+    // Wrapper para trocar de loteria e salvar a preferência
     setLottery(key) {
+      this.loadLotteryData(key);
+      StorageService.set('settings', 'lastLotteryId', key);
+    },
+
+    async loadLotteryData(key) {
       if (!this.presets[key]) return;
+      
+      this.loading = true;
       this.lotteryConfig = { ...this.presets[key] };
       
-      // ALTERADO: Recupera do cache se existir, senão inicia vazio
-      this.results = this.resultsCache[key] || [];
-      
-      // Reseta estruturas auxiliares (mas mantém os dados)
-      this.visitedBitmap = null;
-      this.combTable = null;
-      
-      // Limpa filtros e simulações anteriores para evitar confusão visual
-      if (this.cleanFilters) this.cleanFilters();
-      if (this.resetSim) this.resetSim();
-      
-      // Atualiza configs do gerador
-      if (this.genConfig) {
+      // 1. Tenta Cache de Memória (Rápido)
+      if (this.resultsCache[key]) {
+        this.results = this.resultsCache[key];
+      } else {
+        // 2. Tenta IndexedDB (Persistente)
+        const savedResults = await StorageService.get('results', key);
+        if (savedResults) {
+          this.results = savedResults;
+          this.resultsCache[key] = savedResults;
+        } else {
+          this.results = [];
+        }
+      }
+
+      // 3. Restaura Filtros salvos para esta loteria (se houver)
+      const savedFilters = await StorageService.get('settings', `filters_${key}`);
+      if (savedFilters && this.restoreFilters) {
+        this.restoreFilters(savedFilters);
+      } else if (this.cleanFilters) {
+        this.cleanFilters();
+      }
+
+      // 4. Restaura Config do Gerador
+      const savedGenConfig = await StorageService.get('settings', `gen_${key}`);
+      if (savedGenConfig && this.genConfig) {
+        Object.assign(this.genConfig, savedGenConfig);
+      } else if (this.genConfig) {
+        // Reset gen config defaults
         this.genConfig.minSum = this.lotteryConfig.limits.minSum;
         this.genConfig.maxSum = this.lotteryConfig.limits.maxSum;
       }
+      
+      // Reset de auxiliares
+      this.visitedBitmap = null;
+      this.combTable = null;
+      if (this.resetSim) this.resetSim();
+
+      this.loading = false;
     },
 
     initBitSetSystem() {
@@ -77,10 +127,8 @@ export const CoreModule = {
       const file = e.target.files[0];
       if (!file) return;
 
-      console.log("📂 Arquivo:", file.name, "| Tamanho:", file.size);
-      
       if (file.size === 0) {
-        alert("O arquivo parece vazio (0 bytes).\n\nDICA: Se estiver no Google Drive/Planilhas, use 'Salvar como' > 'CSV' e tente novamente.");
+        alert("O arquivo parece vazio (0 bytes).\n\nDICA: Se estiver no Google Drive/Planilhas, use 'Salvar como' > 'CSV'.");
         e.target.value = '';
         return;
       }
@@ -97,38 +145,26 @@ export const CoreModule = {
           header: false,
           skipEmptyLines: true,
           complete: (res) => {
-            // Proteção contra HTML
             if (res.data.length > 0 && res.data[0][0] && res.data[0][0].includes('<html')) {
                alert("O arquivo é um HTML, não CSV. Baixe novamente.");
                this.loading = false;
                return;
             }
 
-            this.results = res.data.slice(1).map((row) => {
+            const parsedResults = res.data.slice(1).map((row) => {
                 const pick = this.lotteryConfig.pickSize;
                 
-                // --- MODO ESTRITO ---
-                // Verifica se a linha tem tamanho mínimo (ID + Data + Bolas)
                 if (row.length < 2 + pick) return null;
 
-                // Corta EXATAMENTE as colunas logo após a data (índices 2 até 2+pick)
                 const rawFixed = row.slice(2, 2 + pick);
-
-                // Valida cada item desse corte
                 const validNumbers = [];
                 for (let val of rawFixed) {
                     const num = parseInt(val);
-                    // Se não for número ou estiver fora do limite (ex: 61 na Mega), a linha é lixo
-                    if (isNaN(num) || num < 1 || num > this.lotteryConfig.totalNumbers) {
-                        return null; 
-                    }
+                    if (isNaN(num) || num < 1 || num > this.lotteryConfig.totalNumbers) return null; 
                     validNumbers.push(num.toString().padStart(2, '0'));
                 }
 
-                // Ordena os números encontrados
                 const foundNumbers = validNumbers.sort((a, b) => a - b);
-
-                // Parse da Data
                 const [day, month, year] = row[1].split('/');
                 if (!year) return null;
                 
@@ -148,16 +184,19 @@ export const CoreModule = {
                 };
             }).filter(Boolean);
             
-            this.resultsCache[this.lotteryConfig.id] = this.results;
+            // Atualiza memória
+            this.results = parsedResults;
+            this.resultsCache[this.lotteryConfig.id] = parsedResults;
+            
+            // Persiste no IndexedDB
+            StorageService.set('results', this.lotteryConfig.id, parsedResults)
+              .then(() => console.log("Dados salvos no disco com sucesso!"));
             
             this.loading = false;
             this.currentPage = 1;
 
             if (this.results.length === 0) {
-                alert("Nenhum jogo válido encontrado.\n\nVerifique:\n1. Se escolheu a Loteria certa no menu.\n2. Se o CSV tem o formato: Concurso;Data;Bola1;Bola2...");
-            } else {
-                // Feedback visual para confirmar que deu certo
-                console.log(`✅ ${this.results.length} jogos importados com SUCESSO!`);
+                alert("Nenhum jogo válido encontrado.");
             }
           }
         });
